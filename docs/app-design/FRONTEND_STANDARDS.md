@@ -1,459 +1,314 @@
-# ChargePlug EndUser Frontend Standards
+# Invoice Scanner Frontend Standards
 
-Updated: 2026-03-27
+Updated: 2026-04-18
 
-This document defines the current frontend standards for `ChargePlug_user` based on the code that actually exists today. It replaces older guidance that referenced an outdated palette, theme system, and file structure.
+This document defines the frontend standards for the current `invoice-to-excel-expo` app. It replaces older guidance that prescribed a different styling stack or unrelated app architecture.
 
 ## 1. Purpose
 
 Goals:
 
-1. Keep the app consistent across mobile and web.
-2. Make large screens easier to maintain by splitting UI, hooks, and side effects clearly.
-3. Keep styling token-driven and dark-mode safe.
-4. Make async flows predictable for auth, plans, stations, topup, and live charging state.
+1. Keep the invoice scanner UI consistent across screens.
+2. Keep route files focused on flow orchestration.
+3. Keep non-UI logic in hooks and `lib/` modules.
+4. Keep theming dark-mode safe while using NativeWind as the primary styling layer.
+5. Make async loading, empty, and error states explicit.
+6. Preserve the current product workflows while the UI system evolves.
 
 Current stack:
 
 - Expo Router
 - React Native + React 19
-- NativeWind v4 + Tailwind CSS v3
 - Expo SDK 54
-- Zustand for live/session stores
-- SignalR + MQTT integrations for realtime flows
-
-Source of truth for visual tokens:
-
-- `styles/tokens.shared.js`
-- `styles/tokens.ts`
-- `styles/typography.shared.js`
-- `styles/typography.ts`
-- `tailwind.config.js`
-- `COLOR_SUMMARY.md`
-- `Palettecolor.md`
+- TypeScript strict mode
+- NativeWind + Tailwind config
+- semantic theme values in `constants/theme.ts`
+- compatibility theme helpers in `hooks/theme/*` and `components/shared/themed-*`
+- SQLite, Secure Store, image picker/camera, Anthropic API, Excel export
 
 ## 2. Folder Responsibilities
 
-Use the current repo structure as-is:
+Use the current repo structure:
 
 ```text
-app/                 Expo Router route files and route wrappers
-screen/              Large screen implementations used by route wrappers
-components/          Reusable UI and feature sections
-  ui/                Primitive building blocks
-  shared/            Cross-feature UI patterns
-  dashboard/
-  plans/
-  stations/
-  account/
-hooks/               Feature hooks and refresh orchestration
-contexts/            App-wide providers and cross-cutting state
-services/            Platform integrations, auth, notifications, MQTT, stores
-services/store/      Zustand stores
-utils/               Pure helpers and API clients
-styles/              Theme tokens, typography, Tailwind entry
-constants/           Static config, i18n, mock data, domain types
-tests/               Targeted tests for pure logic
+app/                      Route files only
+  _layout.tsx
+  (tabs)/
+  invoice/
+components/
+  invoice/                Invoice list/detail presentational UI
+  scan/                   Scan flow UI
+  shared/                 Reused generic and theme-aware UI
+    ui/                   Small primitives like icons
+hooks/
+  invoice/                Invoice-specific workflows
+  scan/                   Scan/import workflow
+  settings/               API key persistence workflow
+  theme/                  Theme helpers
+lib/                      Non-UI logic: db, api, parser, export, domain types/constants
+constants/                Semantic theme values
 ```
 
 Rules:
 
 1. Route files stay in `app/`.
-2. If a route becomes large or state-heavy, move the implementation into `screen/` and keep the route file thin.
-3. Reusable UI belongs in `components/`, not in `app/`.
-4. Shared behavior belongs in hooks, contexts, services, or utils depending on ownership.
-
-Examples:
-
-```tsx
-// Good: thin route wrapper
-// app/stations/[id].tsx
-import { StationDetailScreen } from '@/screen/StationDetailScreen';
-```
-
-```tsx
-// Good: large implementation outside the route layer
-// screen/StationDetailScreen.tsx
-export function StationDetailScreen() {}
-```
+2. Reusable UI belongs in `components/`.
+3. Stateful workflows belong in `hooks/`.
+4. Database, API, parsing, and export logic belong in `lib/`.
+5. Do not introduce broader layers like `screen/`, `services/`, `contexts/`, or Zustand unless the app genuinely grows to require them.
 
 ## 3. Naming and File Conventions
 
 Rules:
 
-1. Components use `PascalCase`.
+1. Components use `PascalCase` filenames.
 2. Hooks use `camelCase` and start with `use`.
-3. Utils use `camelCase`.
-4. Route group folders use Expo Router naming such as `(tabs)` and `(auth)`.
-5. File names should match the exported component or purpose.
+3. Keep import paths feature-grouped once related files reach more than one item.
+4. Do not rename established files casually if a move does not improve clarity.
 
 Examples:
 
-- `components/ui/Typography.tsx`
-- `components/stations/station-card.tsx`
-- `hooks/plans/useSessionActions.ts`
-- `services/store/charging-session-store.ts`
-
-Use the existing naming style consistently:
-
-- Primitive reusable components are often `PascalCase` files.
-- Feature-specific presentational pieces may be `kebab-case` files.
-- Do not rename existing patterns casually unless doing a deliberate cleanup pass.
+- `components/invoice/InvoiceCard.tsx`
+- `components/scan/LoadingOverlay.tsx`
+- `components/shared/themed-text.tsx`
+- `hooks/scan/useInvoiceScan.ts`
+- `hooks/settings/useStoredApiKey.ts`
 
 ## 4. State Ownership
 
-Use the narrowest state owner that matches the data:
+Use the narrowest owner possible.
 
 ### Local component state
 
 Use `useState` for:
 
-- open/closed UI
 - input values
-- local modal visibility
-- temporary screen-only status
+- loading flags local to one screen/hook
+- local feedback messages
+- temporary UI state such as show/hide toggles
 
-### Contexts
+### Hooks
 
-Current app-wide state lives in contexts:
+Use hooks for one workflow each:
 
-- `AppSettingsProvider`
-  - theme
-  - language
-  - `t()` translation helper
-- `AuthProvider`
-  - tokens
-  - user
-  - auth lifecycle
-  - account refresh coordination
-- `WalletProvider`
-  - balance
-  - transactions
-  - charging plans
-  - topup success notices
-- `DeviceLiveProvider`
-  - lifecycle bridge for live device connectivity
+- `useInvoiceScan` for image selection, image preparation, extraction, and persistence
+- `useInvoiceExport` for export-all and export-single lifecycle state
+- `useStoredApiKey` for Secure Store persistence
 
-### Zustand stores
-
-Use Zustand for shared, fast-changing, cross-screen app state:
-
-- `device-live-store`
-- `charging-session-store`
-- `scanned-socket-store`
-- `visitor-purchase-store`
-
-Do not move auth or wallet domain state into random local component state.
+Do not move these workflows back into route files.
 
 ## 5. Data and Side Effect Placement
 
 Keep responsibilities split like this:
 
-- `utils/`
-  - API clients
-  - pure formatters
-  - validation
-  - document normalization
-- `services/`
-  - auth integration
-  - notifications
-  - secure storage
-  - MQTT / realtime plumbing
-- `hooks/`
-  - feature orchestration
-  - screen refresh logic
-  - derived UI state from multiple sources
+- `app/`
+  - navigation
+  - screen-level composition
+  - route params
+  - confirmation dialogs
 - `components/`
-  - render and interaction only
+  - presentational rendering
+- `hooks/`
+  - stateful workflows and async lifecycle state
+- `lib/`
+  - SQLite helpers
+  - Anthropic request construction
+  - AI response parsing/normalization
+  - Excel generation and sharing
+  - shared domain types/constants
 
 Rules:
 
-1. Screens should not directly own every async workflow if that logic can live in a hook.
-2. Pure helpers go in `utils/`, not inside render files.
-3. Async effects should use an abort signal, cancellation flag, or generation guard when stale responses could corrupt UI state.
-4. If multiple screens need the same refresh behavior, use a shared hook such as `useFocusedRefresh`.
+1. Screens should not build SQL or Anthropic payloads inline.
+2. Components should not talk to Secure Store, SQLite, or remote APIs directly.
+3. `lib/` files must remain React-free.
+4. If formatting logic repeats meaningfully, extract a small pure helper instead of duplicating it.
 
 ## 6. Styling System
 
-The codebase is Tailwind-first, not Tailwind-only.
+This repo is now NativeWind-first.
 
 ### Default rule
 
-Use NativeWind classes for most styling:
+Use:
 
-- layout
-- spacing
-- border radius
-- colors from tokens
-- standard text styling
+- `className` on React Native components for layout, spacing, sizing, radius, and basic composition
+- `global.css` as the Tailwind entry file
+- `tailwind.config.js` for shared tokens
+- `babel.config.js` and `metro.config.js` for NativeWind integration
 
 Example:
 
 ```tsx
-<View className="rounded-3xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark" />
+<View className="rounded-3xl border p-5" />
 ```
 
-### When `StyleSheet` or inline style is correct
+### Theme-driven values
 
-Use `StyleSheet.create` or inline `style` when values are runtime-dependent or unsupported cleanly by class names:
+Use runtime style objects only where they remain the clearest choice, such as:
 
-- absolute positioning from measurements
-- shadows and elevation
-- SVG geometry
-- camera overlays
-- gradient bounds
-- animation transforms
-- dynamic widths/heights
-- runtime colors for `ActivityIndicator`, placeholder text, icons, shadows, gradients
+- values that depend on `useColorScheme()` and `Colors`
+- pressed-state opacity
+- `ActivityIndicator` color
+- semantic borders/backgrounds that still come from `constants/theme.ts`
+- image and overlay styling where NativeWind alone is not enough
 
-This is already the app pattern in:
+Example:
 
-- `app/_layout.tsx`
-- `app/(tabs)/_layout.tsx`
-- `components/shared/pull-to-refresh-scroll-view.tsx`
-- `components/dashboard/SessionRatingPopover.tsx`
-- `components/stations/sort-dropdown.tsx`
+```tsx
+const colorScheme = useColorScheme() ?? 'light';
+const colors = Colors[colorScheme];
 
-Rule:
+<View className="rounded-3xl border p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }} />
+```
 
-1. Prefer classes first.
-2. Use runtime styles when they make the code simpler or are required.
-3. Do not force everything into arbitrary class strings.
+### Migration rules
+
+1. New or heavily touched UI should default to NativeWind.
+2. Existing `StyleSheet.create` code can coexist temporarily in untouched areas.
+3. Do not add large new `StyleSheet.create` blocks for fresh UI unless NativeWind cannot express the need cleanly.
+4. Migrate screen-by-screen or component-by-component rather than mixing multiple styling systems chaotically inside one surface.
+5. Preserve behavior while migrating appearance.
 
 ## 7. Theme and Color Rules
 
-Theme is controlled by `useAppSettings()` and synced to NativeWind with `setColorScheme()`.
+Use semantic values from `constants/theme.ts`.
 
-Use:
+Preferred tokens in this repo:
 
-```ts
-const { theme, t } = useAppSettings();
-const palette = colors[theme];
-```
-
-### Use semantic tokens, not random raw colors
-
-Preferred class tokens:
-
-- `bg-background dark:bg-background-dark`
-- `bg-surface dark:bg-surface-dark`
-- `bg-surface-alt dark:bg-surface-alt-dark`
-- `text-foreground dark:text-foreground-dark`
-- `text-muted dark:text-muted-dark`
-- `text-muted-light dark:text-muted-light-dark`
-- `text-accent dark:text-accent-dark`
-- `border-border dark:border-border-dark`
-- `bg-accent dark:bg-accent-dark`
-- `text-on-accent`
-
-Use runtime palette tokens for:
-
-- `placeholderTextColor`
-- `ActivityIndicator`
-- `LinearGradient`
-- `Svg`
-- `shadowColor`
-- platform-only or computed styles
-
-If a raw color repeats across multiple files and represents a reusable semantic concept, promote it into `styles/tokens.shared.js`.
-
-If it is a very local visual effect, keeping it local is acceptable. The station cards and scanner overlays already do this.
-
-## 8. Typography Rules
-
-All user-facing text should use `Typography` unless there is a hard technical reason to render raw `Text`.
-
-Current variants:
-
-- `heading`
-- `body`
-- `caption`
-- `overline`
-
-Current typography tokens:
-
-- `xs`
-- `sm`
-- `base`
-- `xl`
-
-Variant mapping comes from `styles/typography.shared.js`.
-
-Rules:
-
-1. Use `Typography` for consistency.
-2. Let `Typography` provide the default foreground color unless you need an explicit semantic text color.
-3. Use semantic text classes such as `text-accent`, `text-danger`, `text-success`, `text-muted`.
-4. Avoid ad-hoc font sizes and raw hex colors in text.
-
-## 9. Shared Primitives You Should Reuse
-
-Use the existing building blocks before creating new ones.
-
-### UI primitives
-
-- `Typography`
-- `IconSymbol`
-- `FormField`
-- `KeyboardSafeTextInput`
-- `GuardedPressable`
-
-### Shared layout / interaction helpers
-
-- `KeyboardSafeContainer`
-- `PullToRefreshScrollView`
-- `PageTitle`
-- `IconSectionTitle`
-- `FeatureLock`
-- `UpgradeAccountModal`
-- `GradientBackground`
+- `background`
+- `text`
+- `tint`
+- `icon`
+- `tabIconDefault`
+- `tabIconSelected`
+- `card`
+- `border`
+- `muted`
+- `danger`
+- `success`
+- `warning`
 
 Guidance:
 
-1. Use `GuardedPressable` for async actions that can double-submit.
-2. Use plain `Pressable` for simple navigation or lightweight taps.
-3. Use `KeyboardSafeContainer` for form-heavy screens and modals with inputs.
-4. Use `PullToRefreshScrollView` for refreshable tab screens instead of re-implementing refresh behavior.
-5. Use `FeatureLock` for visitor gating and locked features instead of hand-rolling overlays.
+1. Use `colors.card` + `colors.border` for card surfaces.
+2. Use `colors.muted` for supporting text.
+3. Use `colors.tint` for primary actions.
+4. Use semantic status colors for badges and destructive actions.
+5. Avoid raw hex values when an existing semantic color already expresses the intent.
+6. Mirror durable theme tokens into `tailwind.config.js` rather than maintaining unrelated theme sources.
+
+## 8. Typography Rules
+
+The repo still uses `ThemedText`; it remains acceptable during migration.
+
+Available text variants:
+
+- `default`
+- `title`
+- `defaultSemiBold`
+- `subtitle`
+- `link`
+
+Rules:
+
+1. Prefer `ThemedText` over raw `Text` for themed content unless there is a strong reason not to.
+2. Let `ThemedText` provide the default text color unless a semantic override is needed.
+3. Do not introduce a separate `Typography` system unless the current variants become insufficient.
+4. NativeWind should complement these primitives, not force a parallel text abstraction.
+
+## 9. Shared Primitives to Reuse
+
+Before creating new UI primitives, reuse:
+
+- `components/shared/themed-text.tsx`
+- `components/shared/themed-view.tsx`
+- `components/shared/EmptyState.tsx`
+- `components/shared/ui/icon-symbol.tsx`
+- `components/scan/LoadingOverlay.tsx`
+- `components/scan/ScanButton.tsx`
+- `components/invoice/InvoiceCard.tsx`
+- `components/invoice/FinancialSummary.tsx`
+
+If a compatibility primitive becomes redundant after repeated migration work, deprecate it gradually instead of deleting it impulsively.
 
 ## 10. Screen Composition Patterns
 
-### Tab screens
+### Home screen
 
-Most main screens follow this pattern:
+- route-level data loading and header action wiring
+- empty state, loading state, error banner
+- list rendering via `FlatList`
 
-- root `View className="flex-1"`
-- `PullToRefreshScrollView`
-- content container classes like `px-5 pt-5 pb-24 gap-4`
-- `PageTitle` or `IconSectionTitle`
+### Scan screen
 
-### Auth and upgrade forms
+- route-level orchestration only
+- actions delegated to `useInvoiceScan`
+- preview, error card, and loading overlay visible in the screen
 
-Use:
+### Settings screen
 
-- `KeyboardSafeContainer`
-- `FormField`
-- `GuardedPressable`
-- token-based placeholders and button colors
+- Secure Store workflow delegated to `useStoredApiKey`
+- form UI remains local to the screen until it becomes large enough to extract
 
-### Large route wrappers
+### Invoice detail screen
 
-If the route is mostly a shell, keep it in `app/` and render the real screen from `screen/`.
-
-This pattern is already used for:
-
-- `app/stations/[id].tsx`
-- `app/topup/vietqr.tsx`
-
-### Modals and overlays
-
-Current modal pattern:
-
-1. `Modal` with `transparent` and `statusBarTranslucent`
-2. outer `Pressable` scrim
-3. inner `Pressable` or `View` for the content panel
-4. token-driven surface, border, and text colors
+- route param handling
+- detail loading and delete/export actions
+- presentational sections composed from invoice components
 
 ## 11. Lists and Performance
 
-Do not blindly prefer `FlatList`.
-
-Current app reality:
-
-- Many screens render short or medium sectioned content with `ScrollView`
-- This is acceptable for the current data size and layout composition
-
-Use `FlatList` or `SectionList` only when:
-
-- the list is genuinely long
-- virtualization matters
-- item recycling improves performance measurably
-
-Use `useMemo` and `useCallback` when they improve clarity or stabilize props passed to child components and hooks. Do not wrap everything by default.
-
-Good current examples:
-
-- derived stat themes
-- refresh callbacks
-- anchored popover positioning
-- scan payload parsing helpers
+Use `FlatList` when it fits naturally, like the invoice home list.
+Use `ScrollView` for shorter, sectioned detail and form screens.
+Do not force virtualization or memoization unless it improves clarity or solves a real problem.
 
 ## 12. Async UX Standards
 
 Rules:
 
-1. Show loading states for long-running work.
-2. Prevent duplicate submissions for purchase, login, register, upgrade, and rating flows.
-3. Surface recoverable errors inline when possible.
-4. Retry auth-sensitive requests carefully when token refresh races are possible.
-5. Keep optimistic updates scoped and reversible when the server remains source of truth.
+1. Every async user action must show a visible loading or disabled state.
+2. Every failure path must show a readable user-facing message.
+3. Empty states are preferred over blank UI.
+4. Confirmation is required before destructive invoice deletion.
+5. Retry paths should exist where failure is recoverable.
 
-Current examples:
-
-- `GuardedPressable` for async actions
-- auth refresh mutex in `contexts/auth.tsx`
-- optimistic wallet updates in `contexts/wallet.tsx`
-- polling + SignalR fallback in `screen/TopUpVietQR.tsx`
-
-## 13. Accessibility and i18n
-
-All user-facing copy should come from translations:
-
-```ts
-const { t } = useAppSettings();
-```
+## 13. Accessibility
 
 Rules:
 
-1. Do not hardcode user-visible strings unless they are purely technical placeholders internal to the component.
-2. Add `accessibilityRole`, `accessibilityLabel`, and `accessibilityHint` for interactive controls when meaning is not obvious.
-3. Format currency, dates, countdowns, and locale-dependent values explicitly.
-4. Keep copy compatible with both `vi` and `en`.
+1. Buttons and tappable cards should expose `accessibilityRole` when helpful.
+2. Important actions should remain visually clear in both themes.
+3. Do not rely on color alone for critical meaning when a label can help.
 
 ## 14. Comments and File Documentation
 
-The repo already uses lightweight JSDoc and section dividers in larger files. Keep that style.
-
 Rules:
 
-1. Add short JSDoc comments for exported hooks, providers, and non-obvious components.
-2. Use comments to explain intent, not trivial syntax.
-3. In very large files, section dividers are acceptable if they improve scanability.
-4. Avoid noisy comments that restate the code.
+1. Prefer clear naming over comments.
+2. Add comments only when a constraint or intent is not obvious.
+3. Avoid template comments and noisy narration.
 
 ## 15. What Not To Reintroduce
 
-Do not add new standards that conflict with the current app:
+Do not reintroduce outdated assumptions:
 
-1. Do not reference removed files such as `constants/theme.ts`, `components/themed-text.tsx`, `components/themed-view.tsx`, or `hooks/use-theme-color.ts`.
-2. Do not document the old teal palette.
-3. Do not claim `StyleSheet` is banned. It is allowed where runtime styling is needed.
-4. Do not force `FlatList` for short compositional screens.
-5. Do not put reusable shared UI directly under `app/`.
+1. Do not switch docs back to `StyleSheet.create`-first guidance.
+2. Do not add a `Typography` component just because NativeWind is present.
+3. Do not introduce `screen/`, `services/`, or Zustand architecture without a real need.
+4. Do not copy frontend rules from another product or domain.
+5. Do not let styling migrations change scan, export, settings, or persistence behavior.
 
-## 16. Recommended Default Patterns
-
-When creating a new feature:
-
-1. Put route entry in `app/`.
-2. If the route gets large, move the implementation into `screen/` or feature components.
-3. Keep API and pure data transforms in `utils/` or `services/`.
-4. Use `Typography`, `IconSymbol`, token classes, and `colors[theme]`.
-5. Use `KeyboardSafeContainer` for forms and `PullToRefreshScrollView` for refreshable content screens.
-6. Reuse `FeatureLock` for visitor gating.
-7. Keep light and dark mode correct from the first commit.
-
-## 17. Quick Checklist
+## 16. Quick Checklist
 
 Before merging frontend work, verify:
 
-- route file is thin enough
-- shared pieces extracted out of `app/`
-- all text uses `Typography`
-- colors come from semantic tokens or justified local overrides
-- dark mode works
-- loading, empty, and error states exist where needed
-- async buttons cannot double-submit
-- user-facing strings use `t()`
-- accessibility labels are present for non-obvious controls
-- runtime styles are used only where classes are not enough
+- route files stay focused on orchestration
+- reused UI lives in `components/`
+- workflows stay in hooks or `lib/`
+- new styling defaults to NativeWind in touched UI
+- semantic colors still come from `Colors` where appropriate
+- dark mode still works
+- loading, empty, and error states are visible
+- no starter/demo UI remains in active flows
+- docs still match the actual repo setup

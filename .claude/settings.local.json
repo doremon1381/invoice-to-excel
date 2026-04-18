@@ -5,7 +5,12 @@
       "Bash(npx expo:*)",
       "Bash(npm install:*)",
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm view:*)",
+      "Bash(npm pack:*)",
+      "Bash(grep -E '\\\\.js$')",
+      "Bash(npm exec:*)"
     ]
   }
 }

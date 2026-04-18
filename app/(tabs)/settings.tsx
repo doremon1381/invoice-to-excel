@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { ThemedText } from '@/components/shared/themed-text';
+import { ThemedView } from '@/components/shared/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useStoredApiKey } from '@/hooks/useStoredApiKey';
+import { useStoredApiKey } from '@/hooks/settings/useStoredApiKey';
+import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 import { testAnthropicConnection } from '@/lib/anthropic';
 
 export default function SettingsScreen() {
@@ -24,7 +24,7 @@ export default function SettingsScreen() {
   async function handleSave() {
     try {
       await saveApiKey(draftApiKey);
-      setFeedbackMessage('API key saved successfully.');
+      setFeedbackMessage(draftApiKey.trim() ? 'API key saved successfully.' : 'API key removed.');
     } catch {
       setFeedbackMessage('Unable to save the API key.');
     }
@@ -50,132 +50,73 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText type="title">Settings</ThemedText>
-        <ThemedText style={[styles.description, { color: colors.muted }]}>
-          Save your Anthropic API key securely before scanning invoices.
-        </ThemedText>
+    <ThemedView className="flex-1" style={{ backgroundColor: colors.background }}>
+      <ScrollView contentContainerClassName="px-5 pb-8 pt-4">
+        <View className="gap-2">
+          <ThemedText type="title">Settings</ThemedText>
+          <ThemedText style={{ color: colors.muted }}>
+            Save your Anthropic API key securely before scanning invoices.
+          </ThemedText>
+        </View>
 
-        <View style={styles.section}>
+        <View className="mt-6 rounded-3xl border p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
           <ThemedText type="defaultSemiBold">Anthropic API Key</ThemedText>
           {isLoading ? (
-            <ActivityIndicator color={colors.tint} style={styles.loading} />
+            <ActivityIndicator color={colors.tint} style={{ marginTop: 12 }} />
           ) : (
-            <>
+            <View className="mt-4 gap-4">
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
+                className="min-h-[52px] rounded-2xl border px-4 py-3"
                 onChangeText={setDraftApiKey}
                 placeholder="sk-ant-..."
                 placeholderTextColor={colors.muted}
                 secureTextEntry={!showApiKey}
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.border,
-                    color: colors.text,
-                  },
-                ]}
+                style={{ borderColor: colors.border, color: colors.text }}
                 value={draftApiKey}
               />
 
-              <View style={styles.toggleRow}>
+              <View className="flex-row items-center justify-between">
                 <ThemedText>Show API key</ThemedText>
                 <Switch onValueChange={setShowApiKey} value={showApiKey} />
               </View>
 
               <Pressable
+                className="min-h-12 items-center justify-center rounded-2xl px-4"
                 onPress={handleSave}
-                style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.tint, opacity: pressed ? 0.85 : 1 }]}>
-                <ThemedText lightColor="#FFFFFF" darkColor="#FFFFFF">Save API Key</ThemedText>
+                style={({ pressed }) => ({ backgroundColor: colors.tint, opacity: pressed ? 0.85 : 1 })}>
+                <ThemedText style={{ color: '#FFFFFF', fontWeight: '700' }}>Save API Key</ThemedText>
               </Pressable>
 
               <Pressable
+                className="min-h-12 items-center justify-center rounded-2xl border px-4"
                 disabled={isTesting}
                 onPress={handleTestConnection}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                    opacity: pressed || isTesting ? 0.85 : 1,
-                  },
-                ]}>
+                style={({ pressed }) => ({
+                  borderColor: colors.border,
+                  backgroundColor: colors.card,
+                  opacity: pressed || isTesting ? 0.85 : 1,
+                })}>
                 <ThemedText>{isTesting ? 'Testing...' : 'Test Connection'}</ThemedText>
               </Pressable>
-            </>
+            </View>
           )}
         </View>
 
         {feedbackMessage ? (
-          <View style={[styles.feedbackCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View className="mt-4 rounded-2xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
             <ThemedText>{feedbackMessage}</ThemedText>
           </View>
         ) : null}
 
         <Pressable
+          className="mt-3 self-start py-2"
           onPress={() => Alert.alert('Tip', 'Set your API key here before scanning invoices.')}
-          style={({ pressed }) => [styles.helpButton, { opacity: pressed ? 0.8 : 1 }]}>
+          style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
           <ThemedText style={{ color: colors.muted }}>Why do I need this?</ThemedText>
         </Pressable>
       </ScrollView>
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    gap: 16,
-    padding: 20,
-  },
-  description: {
-    marginTop: 4,
-  },
-  section: {
-    gap: 12,
-    marginTop: 12,
-  },
-  input: {
-    borderRadius: 12,
-    borderWidth: 1,
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  toggleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  primaryButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: 14,
-  },
-  feedbackCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-  },
-  helpButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-  },
-  loading: {
-    marginTop: 12,
-  },
-});

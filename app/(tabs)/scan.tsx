@@ -1,14 +1,14 @@
 import { useRouter } from 'expo-router';
-import { Alert, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, ScrollView, View } from 'react-native';
 
-import { LoadingOverlay } from '@/components/LoadingOverlay';
-import { ScanButton } from '@/components/ScanButton';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { LoadingOverlay } from '@/components/scan/LoadingOverlay';
+import { ScanButton } from '@/components/scan/ScanButton';
+import { ThemedText } from '@/components/shared/themed-text';
+import { ThemedView } from '@/components/shared/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useInvoiceScan } from '@/hooks/useInvoiceScan';
-import { useStoredApiKey } from '@/hooks/useStoredApiKey';
+import { useInvoiceScan } from '@/hooks/scan/useInvoiceScan';
+import { useStoredApiKey } from '@/hooks/settings/useStoredApiKey';
+import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -17,47 +17,60 @@ export default function ScanScreen() {
   const { apiKey } = useStoredApiKey();
   const { error, isLoading, pickFromLibrary, previewUri, setError, takePhoto } = useInvoiceScan();
 
-  async function handleTakePhoto() {
+  async function handleScanAction(
+    action: (storedApiKey: string) => Promise<{ invoiceId: number; imageUri: string } | null>,
+    errorTitle: string,
+    fallbackMessage: string,
+  ) {
     try {
-      const result = await takePhoto(apiKey);
+      const result = await action(apiKey);
 
       if (result) {
         router.push(`/invoice/${result.invoiceId}`);
       }
     } catch (caughtError) {
-      Alert.alert('Scan failed', caughtError instanceof Error ? caughtError.message : 'Unable to scan invoice.');
+      Alert.alert(errorTitle, caughtError instanceof Error ? caughtError.message : fallbackMessage);
     }
+  }
+
+  async function handleTakePhoto() {
+    await handleScanAction(takePhoto, 'Scan failed', 'Unable to scan invoice.');
   }
 
   async function handlePickImage() {
-    try {
-      const result = await pickFromLibrary(apiKey);
-
-      if (result) {
-        router.push(`/invoice/${result.invoiceId}`);
-      }
-    } catch (caughtError) {
-      Alert.alert('Import failed', caughtError instanceof Error ? caughtError.message : 'Unable to import invoice.');
-    }
+    await handleScanAction(pickFromLibrary, 'Import failed', 'Unable to import invoice.');
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText type="title">Scan Invoice</ThemedText>
-        <ThemedText style={[styles.description, { color: colors.muted }]}>Take a photo or choose an invoice image from your gallery.</ThemedText>
+    <ThemedView className="flex-1" style={{ backgroundColor: colors.background }}>
+      <ScrollView contentContainerClassName="px-5 pb-8 pt-4">
+        <View className="gap-2">
+          <ThemedText type="title">Scan invoice</ThemedText>
+          <ThemedText style={{ color: colors.muted }}>
+            Take a photo or choose an invoice image from your gallery, then let the app extract the structured data.
+          </ThemedText>
+        </View>
 
-        <View style={styles.actions}>
+        <View className="mt-6 gap-3">
           <ScanButton label="Take Photo" onPress={handleTakePhoto} />
           <ScanButton label="Choose from Gallery" onPress={handlePickImage} />
         </View>
 
-        {previewUri ? <Image source={{ uri: previewUri }} style={[styles.previewImage, { borderColor: colors.border }]} /> : null}
+        {previewUri ? (
+          <View className="mt-6 rounded-3xl border p-3" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+            <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
+              Preview
+            </ThemedText>
+            <Image source={{ uri: previewUri }} className="aspect-square w-full rounded-2xl" style={{ borderColor: colors.border }} />
+          </View>
+        ) : null}
 
         {error ? (
-          <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View className="mt-6 rounded-3xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
             <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
-            <ScanButton label="Clear error" onPress={() => setError(null)} />
+            <View className="mt-3">
+              <ScanButton label="Clear error" onPress={() => setError(null)} />
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -66,33 +79,3 @@ export default function ScanScreen() {
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    gap: 16,
-    padding: 20,
-  },
-  description: {
-    marginTop: 4,
-  },
-  actions: {
-    gap: 12,
-    marginTop: 12,
-  },
-  previewImage: {
-    aspectRatio: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 8,
-    width: '100%',
-  },
-  errorCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-    padding: 16,
-  },
-});

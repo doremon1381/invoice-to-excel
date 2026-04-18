@@ -1,14 +1,14 @@
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useLayoutEffect, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Pressable, View } from 'react-native';
 
-import { EmptyState } from '@/components/EmptyState';
-import { InvoiceCard } from '@/components/InvoiceCard';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { InvoiceCard } from '@/components/invoice/InvoiceCard';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ThemedText } from '@/components/shared/themed-text';
+import { ThemedView } from '@/components/shared/themed-view';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useInvoiceExport } from '@/hooks/useInvoiceExport';
+import { useInvoiceExport } from '@/hooks/invoice/useInvoiceExport';
+import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 import { deleteInvoice, getAllInvoicesWithData, initializeDatabase } from '@/lib/db';
 import type { InvoiceListItem } from '@/lib/types';
 
@@ -60,17 +60,21 @@ export default function HomeScreen() {
     navigation.setOptions({
       headerRight: () => (
         <Pressable
+          accessibilityRole="button"
+          className="rounded-full border px-4 py-2"
           disabled={invoices.length === 0 || isExporting}
           onPress={handleExportAll}
           style={({ pressed }) => ({
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            borderWidth: 1,
             opacity: invoices.length === 0 ? 0.4 : pressed ? 0.7 : 1,
-            paddingHorizontal: 8,
           })}>
-          <ThemedText>{isExporting ? 'Exporting...' : 'Export All'}</ThemedText>
+          <ThemedText style={{ fontWeight: '600' }}>{isExporting ? 'Exporting...' : 'Export All'}</ThemedText>
         </Pressable>
       ),
     });
-  }, [handleExportAll, invoices.length, isExporting, navigation]);
+  }, [colors.border, colors.card, handleExportAll, invoices.length, isExporting, navigation]);
 
   function handleDelete(invoiceId: number) {
     Alert.alert('Delete invoice', 'Are you sure you want to delete this invoice?', [
@@ -82,8 +86,11 @@ export default function HomeScreen() {
           try {
             await deleteInvoice(invoiceId);
             await loadInvoices();
-          } catch {
-            Alert.alert('Delete failed', 'Unable to delete the invoice.');
+          } catch (caughtError) {
+            Alert.alert(
+              'Delete failed',
+              caughtError instanceof Error ? caughtError.message : 'Unable to delete the invoice.',
+            );
           }
         },
       },
@@ -91,70 +98,56 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      {error ? (
-        <View style={[styles.banner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
+    <ThemedView className="flex-1" style={{ backgroundColor: colors.background }}>
+      <View className="flex-1 px-5 pb-5 pt-4">
+        <View className="mb-5 gap-2">
+          <ThemedText type="title">Invoice archive</ThemedText>
+          <ThemedText style={{ color: colors.muted }}>
+            Review extracted invoices, manage your local history, and export your records to Excel.
+          </ThemedText>
         </View>
-      ) : null}
 
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ThemedText>Loading invoices...</ThemedText>
-        </View>
-      ) : invoices.length === 0 ? (
-        <View style={styles.content}>
-          <EmptyState
-            title="No invoices yet"
-            description="Scan a paper invoice or import one from your gallery to start building your local invoice archive."
-          />
-          <ThemedText style={[styles.exportHint, { color: colors.muted }]}>Export All stays disabled until at least one invoice exists.</ThemedText>
-        </View>
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.listContent}
-          data={invoices}
-          keyExtractor={(item) => String(item.id)}
-          onRefresh={() => void loadInvoices()}
-          refreshing={isLoading}
-          renderItem={({ item }) => (
-            <InvoiceCard
-              invoice={item}
-              onDelete={() => handleDelete(item.id)}
-              onPress={() => router.push(`/invoice/${item.id}`)}
+        {error ? (
+          <View
+            className="mb-4 rounded-2xl border px-4 py-3"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+            <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
+          </View>
+        ) : null}
+
+        {isLoading ? (
+          <View className="flex-1 items-center justify-center px-5">
+            <ThemedText>Loading invoices...</ThemedText>
+          </View>
+        ) : invoices.length === 0 ? (
+          <View className="flex-1">
+            <EmptyState
+              title="No invoices yet"
+              description="Scan a paper invoice or import one from your gallery to start building your local invoice archive."
             />
-          )}
-        />
-      )}
+            <ThemedText className="mt-3 text-center" style={{ color: colors.muted }}>
+              Export All stays disabled until at least one invoice exists.
+            </ThemedText>
+          </View>
+        ) : (
+          <FlatList
+            className="flex-1"
+            contentContainerClassName="pb-6"
+            data={invoices}
+            keyExtractor={(item) => String(item.id)}
+            onRefresh={() => void loadInvoices()}
+            refreshing={isLoading}
+            renderItem={({ item }) => (
+              <InvoiceCard
+                invoice={item}
+                onDelete={() => handleDelete(item.id)}
+                onPress={() => router.push(`/invoice/${item.id}`)}
+              />
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centered: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  content: {
-    padding: 20,
-  },
-  listContent: {
-    padding: 20,
-  },
-  banner: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 14,
-  },
-  exportHint: {
-    marginTop: 12,
-    textAlign: 'center',
-  },
-});

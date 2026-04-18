@@ -1,8 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
+import { ThemedText } from '@/components/shared/themed-text';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
 interface FinancialSummaryProps {
   subtotal: number | null;
@@ -31,12 +31,14 @@ export function FinancialSummary({
   const colors = Colors[colorScheme];
 
   return (
-    <View style={[styles.container, { borderColor: colors.border, backgroundColor: colors.card }]}>
-      <SummaryRow label="Subtotal" value={formatCurrency(subtotal, currency)} />
-      <SummaryRow label="Tax" value={formatCurrency(taxAmount, currency)} />
-      <SummaryRow label="Discount" value={formatCurrency(discountAmount, currency)} />
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      <SummaryRow label="Total" value={formatCurrency(totalAmount, currency)} emphasized />
+    <View className="rounded-3xl border p-5" style={{ borderColor: colors.border, backgroundColor: colors.card }}>
+      <View className="gap-3">
+        <SummaryRow label="Subtotal" value={formatCurrency(subtotal, currency)} />
+        <SummaryRow label="Tax" value={formatCurrency(taxAmount, currency)} />
+        <SummaryRow label="Discount" value={formatCurrency(discountAmount, currency)} />
+        <View className="h-px" style={{ backgroundColor: colors.border }} />
+        <SummaryRow label="Total" value={formatCurrency(totalAmount, currency)} emphasized />
+      </View>
     </View>
   );
 }
@@ -51,25 +53,9 @@ function SummaryRow({
   emphasized?: boolean;
 }) {
   return (
-    <View style={styles.row}>
+    <View className="flex-row justify-between gap-4">
       <ThemedText type={emphasized ? 'defaultSemiBold' : 'default'}>{label}</ThemedText>
       <ThemedText type={emphasized ? 'defaultSemiBold' : 'default'}>{value}</ThemedText>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-    padding: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  divider: {
-    height: 1,
-  },
-});
