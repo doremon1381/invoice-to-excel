@@ -1,0 +1,255 @@
+import * as SQLite from 'expo-sqlite';
+
+import { DEFAULT_CURRENCY } from '@/lib/constants';
+import type {
+  ExtractedInvoice,
+  InvoiceDetail,
+  InvoiceListItem,
+  InvoiceRow,
+  LineItem,
+  SaveInvoiceInput,
+} from '@/lib/types';
+
+const database = SQLite.openDatabaseSync('invoices.db');
+
+function mapInvoiceListItem(row: Record<string, SQLite.SQLiteBindValue>): InvoiceListItem {
+  return {
+    id: Number(row.id),
+    image_uri: String(row.image_uri),
+    raw_text: row.raw_text ? String(row.raw_text) : null,
+    scanned_at: String(row.scanned_at),
+    status: String(row.status) as InvoiceListItem['status'],
+    vendor_name: row.vendor_name ? String(row.vendor_name) : null,
+    invoice_number: row.invoice_number ? String(row.invoice_number) : null,
+    invoice_date: row.invoice_date ? String(row.invoice_date) : null,
+    total_amount: typeof row.total_amount === 'number' ? row.total_amount : row.total_amount ? Number(row.total_amount) : null,
+    currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
+  };
+}
+
+function mapLineItem(row: Record<string, SQLite.SQLiteBindValue>): LineItem {
+  return {
+    id: Number(row.id),
+    invoice_id: Number(row.invoice_id),
+    description: row.description ? String(row.description) : '',
+    quantity: typeof row.quantity === 'number' ? row.quantity : row.quantity ? Number(row.quantity) : null,
+    unit: row.unit ? String(row.unit) : null,
+    unit_price: typeof row.unit_price === 'number' ? row.unit_price : row.unit_price ? Number(row.unit_price) : null,
+    total_price: typeof row.total_price === 'number' ? row.total_price : row.total_price ? Number(row.total_price) : null,
+  };
+}
+
+export async function initializeDatabase(): Promise<void> {
+  await database.execAsync(`
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      image_uri TEXT NOT NULL,
+      raw_text TEXT,
+      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      status TEXT DEFAULT 'pending'
+    );
+
+    CREATE TABLE IF NOT EXISTS invoice_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      vendor_name TEXT,
+      vendor_address TEXT,
+      invoice_number TEXT,
+      invoice_date TEXT,
+      due_date TEXT,
+      subtotal REAL,
+      tax_amount REAL,
+      discount_amount REAL,
+      total_amount REAL,
+      currency TEXT DEFAULT 'VND',
+      payment_method TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS line_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      description TEXT,
+      quantity REAL,
+      unit_price REAL,
+      unit TEXT,
+      total_price REAL
+    );
+  `);
+}
+
+export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
+  await initializeDatabase();
+
+  const createdInvoice = await database.runAsync(
+    'INSERT INTO invoices (image_uri, raw_text, status) VALUES (?, ?, ?)',
+    [input.imageUri, input.rawText, input.status],
+  );
+
+  const invoiceId = Number(createdInvoice.lastInsertRowId);
+  const extracted = input.extracted;
+
+  await database.runAsync(
+    `INSERT INTO invoice_data (
+      invoice_id,
+      vendor_name,
+      vendor_address,
+      invoice_number,
+      invoice_date,
+      due_date,
+      subtotal,
+      tax_amount,
+      discount_amount,
+      total_amount,
+      currency,
+      payment_method,
+      notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      invoiceId,
+      extracted.vendor_name,
+      extracted.vendor_address,
+      extracted.invoice_number,
+      extracted.invoice_date,
+      extracted.due_date,
+      extracted.subtotal,
+      extracted.tax_amount,
+      extracted.discount_amount,
+      extracted.total_amount,
+      extracted.currency,
+      extracted.payment_method,
+      extracted.notes,
+    ],
+  );
+
+  for (const item of extracted.line_items) {
+    await database.runAsync(
+      'INSERT INTO line_items (invoice_id, description, quantity, unit_price, unit, total_price) VALUES (?, ?, ?, ?, ?, ?)',
+      [invoiceId, item.description, item.quantity, item.unit_price, item.unit, item.total_price],
+    );
+  }
+
+  return invoiceId;
+}
+
+export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
+  await initializeDatabase();
+
+  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(`
+    SELECT
+      invoices.id,
+      invoices.image_uri,
+      invoices.raw_text,
+      invoices.scanned_at,
+      invoices.status,
+      invoice_data.vendor_name,
+      invoice_data.invoice_number,
+      invoice_data.invoice_date,
+      invoice_data.total_amount,
+      invoice_data.currency
+    FROM invoices
+    LEFT JOIN invoice_data ON invoice_data.invoice_id = invoices.id
+    ORDER BY invoices.scanned_at DESC
+  `);
+
+  return rows.map(mapInvoiceListItem);
+}
+
+export async function getInvoiceById(invoiceId: number): Promise<InvoiceDetail> {
+  await initializeDatabase();
+
+  const row = await database.getFirstAsync<Record<string, SQLite.SQLiteBindValue>>(
+    `SELECT
+      invoices.id,
+      invoices.image_uri,
+      invoices.raw_text,
+      invoices.scanned_at,
+      invoices.status,
+      invoice_data.vendor_name,
+      invoice_data.vendor_address,
+      invoice_data.invoice_number,
+      invoice_data.invoice_date,
+      invoice_data.due_date,
+      invoice_data.subtotal,
+      invoice_data.tax_amount,
+      invoice_data.discount_amount,
+      invoice_data.total_amount,
+      invoice_data.currency,
+      invoice_data.payment_method,
+      invoice_data.notes
+    FROM invoices
+    LEFT JOIN invoice_data ON invoice_data.invoice_id = invoices.id
+    WHERE invoices.id = ?
+    LIMIT 1`,
+    [invoiceId],
+  );
+
+  if (!row) {
+    throw new Error('Invoice not found.');
+  }
+
+  const lineItems = await getLineItems(invoiceId);
+
+  return {
+    id: Number(row.id),
+    image_uri: String(row.image_uri),
+    raw_text: row.raw_text ? String(row.raw_text) : null,
+    scanned_at: String(row.scanned_at),
+    status: String(row.status) as InvoiceRow['status'],
+    vendor_name: row.vendor_name ? String(row.vendor_name) : null,
+    vendor_address: row.vendor_address ? String(row.vendor_address) : null,
+    invoice_number: row.invoice_number ? String(row.invoice_number) : null,
+    invoice_date: row.invoice_date ? String(row.invoice_date) : null,
+    due_date: row.due_date ? String(row.due_date) : null,
+    subtotal: typeof row.subtotal === 'number' ? row.subtotal : row.subtotal ? Number(row.subtotal) : null,
+    tax_amount: typeof row.tax_amount === 'number' ? row.tax_amount : row.tax_amount ? Number(row.tax_amount) : null,
+    discount_amount: typeof row.discount_amount === 'number' ? row.discount_amount : row.discount_amount ? Number(row.discount_amount) : null,
+    total_amount: typeof row.total_amount === 'number' ? row.total_amount : row.total_amount ? Number(row.total_amount) : null,
+    currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
+    payment_method: row.payment_method ? String(row.payment_method) : null,
+    notes: row.notes ? String(row.notes) : null,
+    line_items: lineItems,
+  };
+}
+
+export async function getLineItems(invoiceId: number): Promise<LineItem[]> {
+  await initializeDatabase();
+
+  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
+    'SELECT id, invoice_id, description, quantity, unit_price, unit, total_price FROM line_items WHERE invoice_id = ? ORDER BY id ASC',
+    [invoiceId],
+  );
+
+  return rows.map(mapLineItem);
+}
+
+export async function deleteInvoice(invoiceId: number): Promise<void> {
+  await initializeDatabase();
+  await database.runAsync('DELETE FROM invoices WHERE id = ?', [invoiceId]);
+}
+
+export async function getInvoiceCount(): Promise<number> {
+  await initializeDatabase();
+  const result = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM invoices');
+  return result?.count ?? 0;
+}
+
+export function createPendingInvoice(imageUri: string): ExtractedInvoice {
+  return {
+    vendor_name: null,
+    vendor_address: null,
+    invoice_number: null,
+    invoice_date: null,
+    due_date: null,
+    subtotal: null,
+    tax_amount: null,
+    discount_amount: null,
+    total_amount: null,
+    currency: DEFAULT_CURRENCY,
+    payment_method: null,
+    notes: null,
+    line_items: [],
+  };
+}

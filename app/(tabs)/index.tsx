@@ -1,98 +1,160 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useLayoutEffect, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { EmptyState } from '@/components/EmptyState';
+import { InvoiceCard } from '@/components/InvoiceCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useInvoiceExport } from '@/hooks/useInvoiceExport';
+import { deleteInvoice, getAllInvoicesWithData, initializeDatabase } from '@/lib/db';
+import type { InvoiceListItem } from '@/lib/types';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const navigation = useNavigation();
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const { exportAll, isExporting } = useInvoiceExport();
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadInvoices = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await initializeDatabase();
+      const nextInvoices = await getAllInvoicesWithData();
+      setInvoices(nextInvoices);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to load invoices.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadInvoices();
+    }, [loadInvoices]),
+  );
+
+  const handleExportAll = useCallback(async () => {
+    if (invoices.length === 0) {
+      Alert.alert('No invoices', 'Add invoices before exporting.');
+      return;
+    }
+
+    try {
+      await exportAll();
+    } catch (caughtError) {
+      Alert.alert('Export failed', caughtError instanceof Error ? caughtError.message : 'Unable to export invoices.');
+    }
+  }, [exportAll, invoices.length]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          disabled={invoices.length === 0 || isExporting}
+          onPress={handleExportAll}
+          style={({ pressed }) => ({
+            opacity: invoices.length === 0 ? 0.4 : pressed ? 0.7 : 1,
+            paddingHorizontal: 8,
+          })}>
+          <ThemedText>{isExporting ? 'Exporting...' : 'Export All'}</ThemedText>
+        </Pressable>
+      ),
+    });
+  }, [handleExportAll, invoices.length, isExporting, navigation]);
+
+  function handleDelete(invoiceId: number) {
+    Alert.alert('Delete invoice', 'Are you sure you want to delete this invoice?', [
+      { style: 'cancel', text: 'Cancel' },
+      {
+        style: 'destructive',
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            await deleteInvoice(invoiceId);
+            await loadInvoices();
+          } catch {
+            Alert.alert('Delete failed', 'Unable to delete the invoice.');
+          }
+        },
+      },
+    ]);
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      {error ? (
+        <View style={[styles.banner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
+        </View>
+      ) : null}
+
+      {isLoading ? (
+        <View style={styles.centered}>
+          <ThemedText>Loading invoices...</ThemedText>
+        </View>
+      ) : invoices.length === 0 ? (
+        <View style={styles.content}>
+          <EmptyState
+            title="No invoices yet"
+            description="Scan a paper invoice or import one from your gallery to start building your local invoice archive."
+          />
+          <ThemedText style={[styles.exportHint, { color: colors.muted }]}>Export All stays disabled until at least one invoice exists.</ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.listContent}
+          data={invoices}
+          keyExtractor={(item) => String(item.id)}
+          onRefresh={() => void loadInvoices()}
+          refreshing={isLoading}
+          renderItem={({ item }) => (
+            <InvoiceCard
+              invoice={item}
+              onDelete={() => handleDelete(item.id)}
+              onPress={() => router.push(`/invoice/${item.id}`)}
+            />
+          )}
+        />
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  centered: {
     alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  content: {
+    padding: 20,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  listContent: {
+    padding: 20,
+  },
+  banner: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 14,
+  },
+  exportHint: {
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
