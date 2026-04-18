@@ -16,6 +16,18 @@ function getDisplayValue(value: string | null): string {
   return value ?? '—';
 }
 
+function getStatusColor(status: InvoiceDetail['status'], colors: (typeof Colors)['light']): string {
+  if (status === 'success') {
+    return colors.success;
+  }
+
+  if (status === 'error') {
+    return colors.danger;
+  }
+
+  return colors.warning;
+}
+
 function getLineItemAmount(item: LineItem): string {
   if (item.total_price !== null) {
     return String(item.total_price);
@@ -133,19 +145,43 @@ export default function InvoiceDetailScreen() {
     );
   }
 
+  const statusColor = getStatusColor(invoice.status, colors);
+
   return (
     <ThemedView className="flex-1" style={{ backgroundColor: colors.background }}>
       <ScrollView contentContainerClassName="px-5 pb-8 pt-4">
         <Image source={{ uri: invoice.image_uri }} className="aspect-square w-full rounded-3xl" style={{ borderColor: colors.border }} />
 
         <View className="mt-6 rounded-3xl border p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-          <ThemedText type="title">{invoice.vendor_name ?? 'Unknown vendor'}</ThemedText>
+          <View className="flex-row items-start justify-between gap-3">
+            <ThemedText type="title" style={{ flex: 1 }}>{invoice.vendor_name ?? 'Unknown vendor'}</ThemedText>
+            <View className="rounded-full px-3 py-1" style={{ backgroundColor: statusColor }}>
+              <ThemedText style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>
+                {invoice.status}
+              </ThemedText>
+            </View>
+          </View>
           <View className="mt-3 gap-2">
             <ThemedText style={{ color: colors.muted }}>Invoice #{invoice.invoice_number ?? 'N/A'}</ThemedText>
             <ThemedText>Invoice date: {getDisplayValue(invoice.invoice_date)}</ThemedText>
             <ThemedText>Due date: {getDisplayValue(invoice.due_date)}</ThemedText>
             <ThemedText>Payment method: {getDisplayValue(invoice.payment_method)}</ThemedText>
             <ThemedText>Notes: {getDisplayValue(invoice.notes)}</ThemedText>
+          </View>
+        </View>
+
+        <View className="mt-6 rounded-3xl border p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+          <ThemedText type="subtitle">OCR Details</ThemedText>
+          <ThemedText className="mt-2" style={{ color: colors.muted }}>
+            {invoice.status === 'success'
+              ? 'Structured invoice fields were derived from OCR text. Review the captured text below if you need to audit the result.'
+              : 'OCR text was captured, but structured extraction is still limited for this invoice.'}
+          </ThemedText>
+          <View className="mt-4 rounded-2xl border p-4" style={{ backgroundColor: colors.background, borderColor: colors.border }}>
+            <ThemedText type="defaultSemiBold">Captured OCR text</ThemedText>
+            <ThemedText className="mt-2" style={{ color: colors.muted, fontSize: 13 }}>
+              {invoice.raw_text?.trim() ? invoice.raw_text : 'No OCR text was stored for this invoice.'}
+            </ThemedText>
           </View>
         </View>
 

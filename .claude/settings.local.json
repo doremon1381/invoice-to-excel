@@ -10,7 +10,8 @@
       "Bash(npm view:*)",
       "Bash(npm pack:*)",
       "Bash(grep -E '\\\\.js$')",
-      "Bash(npm exec:*)"
+      "Bash(npm exec:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

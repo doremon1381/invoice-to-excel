@@ -70,7 +70,10 @@ export interface SaveInvoiceInput {
   extracted: ExtractedInvoice;
 }
 
-export interface StoredApiKeyState {
-  apiKey: string;
-  hasStoredKey: boolean;
+export interface ExportHistoryEntry {
+  id: string;
+  created_at: string;
+  file_type: 'xlsx';
+  record_count: number;
+  status: 'success' | 'error';
 }

@@ -7,23 +7,21 @@ import { ThemedText } from '@/components/shared/themed-text';
 import { ThemedView } from '@/components/shared/themed-view';
 import { Colors } from '@/constants/theme';
 import { useInvoiceScan } from '@/hooks/scan/useInvoiceScan';
-import { useStoredApiKey } from '@/hooks/settings/useStoredApiKey';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
 export default function ScanScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const { apiKey } = useStoredApiKey();
   const { error, isLoading, pickFromLibrary, previewUri, setError, takePhoto } = useInvoiceScan();
 
   async function handleScanAction(
-    action: (storedApiKey: string) => Promise<{ invoiceId: number; imageUri: string } | null>,
+    action: () => Promise<{ invoiceId: number; imageUri: string } | null>,
     errorTitle: string,
     fallbackMessage: string,
   ) {
     try {
-      const result = await action(apiKey);
+      const result = await action();
 
       if (result) {
         router.push(`/invoice/${result.invoiceId}`);
@@ -47,7 +45,7 @@ export default function ScanScreen() {
         <View className="gap-2">
           <ThemedText type="title">Scan invoice</ThemedText>
           <ThemedText style={{ color: colors.muted }}>
-            Take a photo or choose an invoice image from your gallery, then let the app extract the structured data.
+            Capture or import an invoice image, send it to your PaddleOCR Docker server, and store the detected text locally.
           </ThemedText>
         </View>
 
@@ -65,6 +63,13 @@ export default function ScanScreen() {
           </View>
         ) : null}
 
+        <View className="mt-6 rounded-3xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+          <ThemedText type="defaultSemiBold">Current OCR setup</ThemedText>
+          <ThemedText className="mt-2" style={{ color: colors.muted }}>
+            Anthropic extraction is preserved in the codebase for later, but the active scan flow now uses the PaddleOCR Docker server only.
+          </ThemedText>
+        </View>
+
         {error ? (
           <View className="mt-6 rounded-3xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
             <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
@@ -75,7 +80,7 @@ export default function ScanScreen() {
         ) : null}
       </ScrollView>
 
-      {isLoading ? <LoadingOverlay message="Extracting invoice data…" /> : null}
+      {isLoading ? <LoadingOverlay message="Reading invoice text…" /> : null}
     </ThemedView>
   );
 }

@@ -1,46 +1,16 @@
 import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset, MediaTypeOptions } from 'expo-image-picker';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system/legacy';
 
-import { extractInvoiceData } from '@/lib/anthropic';
-import { IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH } from '@/lib/constants';
+// import { extractInvoiceData } from '@/lib/anthropic';
 import { saveInvoice } from '@/lib/db';
+import { runPaddleOCR } from '@/lib/ocr';
+import { parseOcrText } from '@/lib/parser';
+import { Storage } from '@/lib/storage';
 
 interface ScanResult {
   invoiceId: number;
   imageUri: string;
-}
-
-function getMimeType(asset: ImagePickerAsset): string {
-  if (asset.mimeType === 'image/png') {
-    return 'image/png';
-  }
-
-  return 'image/jpeg';
-}
-
-async function prepareImage(asset: ImagePickerAsset): Promise<{ uri: string; mimeType: string; base64: string }> {
-  const manipulated = await manipulateAsync(
-    asset.uri,
-    [{ resize: { width: IMAGE_MAX_WIDTH } }],
-    {
-      compress: IMAGE_COMPRESS_QUALITY,
-      format: SaveFormat.JPEG,
-      base64: false,
-    },
-  );
-
-  const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  return {
-    uri: manipulated.uri,
-    mimeType: getMimeType(asset),
-    base64,
-  };
 }
 
 export function useInvoiceScan() {
@@ -48,29 +18,35 @@ export function useInvoiceScan() {
   const [error, setError] = useState<string | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
-  const processAsset = useCallback(async (asset: ImagePickerAsset, apiKey: string): Promise<ScanResult> => {
-    if (!apiKey.trim()) {
-      throw new Error('Please save your Anthropic API key before scanning.');
+  const processAsset = useCallback(async (asset: ImagePickerAsset): Promise<ScanResult> => {
+    const serverUrl = await Storage.getOCRServerUrl();
+
+    if (!serverUrl) {
+      throw new Error('Please save your PaddleOCR server URL before scanning.');
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const preparedImage = await prepareImage(asset);
-      setPreviewUri(preparedImage.uri);
+      setPreviewUri(asset.uri);
+      const ocrResult = await runPaddleOCR(asset.uri, serverUrl);
 
-      const { extracted, rawText } = await extractInvoiceData(preparedImage.base64, preparedImage.mimeType, apiKey);
+      if (!ocrResult.full_text.trim()) {
+        throw new Error('No text was found in the invoice image. Try a clearer photo.');
+      }
+
+      const { extracted, status } = parseOcrText(ocrResult.full_text);
       const invoiceId = await saveInvoice({
-        imageUri: preparedImage.uri,
-        rawText,
-        status: 'success',
+        imageUri: asset.uri,
+        rawText: ocrResult.full_text,
+        status,
         extracted,
       });
 
       return {
         invoiceId,
-        imageUri: preparedImage.uri,
+        imageUri: asset.uri,
       };
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Failed to scan invoice.';
@@ -81,7 +57,7 @@ export function useInvoiceScan() {
     }
   }, []);
 
-  const pickFromLibrary = useCallback(async (apiKey: string) => {
+  const pickFromLibrary = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
@@ -98,10 +74,10 @@ export function useInvoiceScan() {
       return null;
     }
 
-    return processAsset(result.assets[0], apiKey);
+    return processAsset(result.assets[0]);
   }, [processAsset]);
 
-  const takePhoto = useCallback(async (apiKey: string) => {
+  const takePhoto = useCallback(async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
@@ -118,7 +94,7 @@ export function useInvoiceScan() {
       return null;
     }
 
-    return processAsset(result.assets[0], apiKey);
+    return processAsset(result.assets[0]);
   }, [processAsset]);
 
   return {

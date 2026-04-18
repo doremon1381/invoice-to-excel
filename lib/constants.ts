@@ -5,6 +5,8 @@ export const DEFAULT_CURRENCY = 'VND';
 export const IMAGE_MAX_WIDTH = 1200;
 export const IMAGE_COMPRESS_QUALITY = 0.8;
 export const API_KEY_STORAGE_KEY = 'anthropic_api_key';
+export const OCR_SERVER_URL_STORAGE_KEY = 'ocr_server_url';
+export const EXPORT_HISTORY_STORAGE_KEY = 'export_history';
 export const MAX_ANTHROPIC_TOKENS = 2048;
 
 export const EXTRACTION_PROMPT = `You are a financial data extraction specialist. Analyze this invoice image and extract all financial information.

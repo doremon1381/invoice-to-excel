@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { AppThemeProvider } from '@/hooks/theme/theme-provider';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 import { initializeDatabase } from '@/lib/db';
 
@@ -13,7 +14,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+function RootNavigator() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
@@ -25,8 +26,17 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="invoice/[id]" options={{ title: 'Invoice Detail' }} />
+        <Stack.Screen name="database-management" options={{ title: 'Database Management' }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <RootNavigator />
+    </AppThemeProvider>
   );
 }

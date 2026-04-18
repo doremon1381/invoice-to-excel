@@ -3,6 +3,8 @@ import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 
 import { getAllInvoicesWithData, getInvoiceById, getLineItems } from '@/lib/db';
+import { Storage } from '@/lib/storage';
+import type { ExportHistoryEntry } from '@/lib/types';
 
 export async function exportAllInvoicesToExcel(): Promise<void> {
   const invoices = await getAllInvoicesWithData();
@@ -25,7 +27,7 @@ export async function exportAllInvoicesToExcel(): Promise<void> {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Invoices');
 
-  await writeAndShare(workbook, `invoices_export_${dateStamp()}.xlsx`);
+  await writeAndShare(workbook, `invoices_export_${dateStamp()}.xlsx`, invoices.length);
 }
 
 export async function exportSingleInvoiceToExcel(invoiceId: number): Promise<void> {
@@ -59,10 +61,10 @@ export async function exportSingleInvoiceToExcel(invoiceId: number): Promise<voi
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(headerRows), 'Invoice');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(lineRows), 'Line Items');
 
-  await writeAndShare(workbook, `invoice_${invoice.invoice_number ?? invoiceId}_${dateStamp()}.xlsx`);
+  await writeAndShare(workbook, `invoice_${invoice.invoice_number ?? invoiceId}_${dateStamp()}.xlsx`, 1);
 }
 
-async function writeAndShare(workbook: XLSX.WorkBook, filename: string): Promise<void> {
+async function writeAndShare(workbook: XLSX.WorkBook, filename: string, recordCount: number): Promise<void> {
   const base64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
   const documentDirectory = FileSystem.documentDirectory;
 
@@ -87,6 +89,16 @@ async function writeAndShare(workbook: XLSX.WorkBook, filename: string): Promise
     dialogTitle: 'Export Invoice',
     UTI: 'com.microsoft.excel.xlsx',
   });
+
+  const historyEntry: ExportHistoryEntry = {
+    id: `${filename}-${Date.now()}`,
+    created_at: new Date().toISOString(),
+    file_type: 'xlsx',
+    record_count: recordCount,
+    status: 'success',
+  };
+
+  await Storage.addExportHistoryEntry(historyEntry);
 }
 
 function dateStamp(): string {
