@@ -1,12 +1,12 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { View } from 'react-native';
+import { Tabs } from "expo-router";
+import React from "react";
+import { View } from "react-native";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { ThemedText } from '@/components/shared/themed-text';
-import { IconSymbol } from '@/components/shared/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/theme/use-color-scheme';
+import { HapticTab } from "@/components/haptic-tab";
+import { ThemedText } from "@/components/shared/themed-text";
+import { IconSymbol } from "@/components/shared/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
 function TabPill({
   color,
@@ -17,9 +17,9 @@ function TabPill({
   primary = false,
 }: {
   color: string;
-  colors: (typeof Colors)['light'];
+  colors: (typeof Colors)["light"];
   focused: boolean;
-  icon: 'house.fill' | 'camera.fill' | 'gearshape.fill';
+  icon: "house.fill" | "camera.fill" | "gearshape.fill";
   label: string;
   primary?: boolean;
 }) {
@@ -30,27 +30,33 @@ function TabPill({
   return (
     <View
       style={{
-        alignItems: 'center',
-        backgroundColor: focused ? activeBackgroundColor : 'transparent',
-        borderColor: focused && !primary ? colors.border : 'transparent',
+        alignItems: "center",
+        backgroundColor: focused ? activeBackgroundColor : "transparent",
+        borderColor: focused && !primary ? colors.border : "transparent",
         borderWidth: focused && !primary ? 1 : 0,
         borderRadius: 22,
-        flexDirection: 'row',
+        flexDirection: "row",
         gap: focused ? 8 : 0,
-        justifyContent: 'center',
+        justifyContent: "center",
         minHeight: 46,
         minWidth: primary && focused ? 108 : focused ? 92 : 54,
         paddingHorizontal: focused ? 14 : 10,
         paddingVertical: 10,
-      }}>
-      <IconSymbol size={22} name={icon} color={focused ? activeIconColor : color} />
+      }}
+    >
+      <IconSymbol
+        size={22}
+        name={icon}
+        color={focused ? activeIconColor : color}
+      />
       {focused ? (
         <ThemedText
           style={{
             color: activeLabelColor,
             fontSize: 12,
-            fontWeight: '700',
-          }}>
+            fontWeight: "700",
+          }}
+        >
           {label}
         </ThemedText>
       ) : null}
@@ -59,7 +65,7 @@ function TabPill({
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
   return (
@@ -73,7 +79,7 @@ export default function TabLayout() {
         headerTitleStyle: {
           color: colors.text,
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
         },
         headerTintColor: colors.text,
         sceneStyle: {
@@ -84,7 +90,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.icon,
         tabBarShowLabel: false,
         tabBarStyle: {
-          position: 'absolute',
+          position: "absolute",
           left: 18,
           right: 18,
           bottom: 18,
@@ -94,9 +100,9 @@ export default function TabLayout() {
           borderTopWidth: 0,
           borderRadius: 32,
           backgroundColor: colors.card,
-          shadowColor: '#000000',
+          shadowColor: "#000000",
           shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: colorScheme === 'dark' ? 0.24 : 0.1,
+          shadowOpacity: colorScheme === "dark" ? 0.24 : 0.1,
           shadowRadius: 18,
           elevation: 10,
         },
@@ -105,34 +111,54 @@ export default function TabLayout() {
           marginVertical: 2,
           borderRadius: 24,
         },
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          headerTitle: 'Invoice Dashboard',
+          title: "Home",
+          headerTitle: "Invoice Dashboard",
           tabBarIcon: ({ color, focused }) => (
-            <TabPill color={color} colors={colors} focused={focused} icon="house.fill" label="Home" />
+            <TabPill
+              color={color}
+              colors={colors}
+              focused={focused}
+              icon="house.fill"
+              label="Home"
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="scan"
         options={{
-          title: 'Scan',
-          headerTitle: 'Scan Invoice',
+          title: "Scan",
+          headerTitle: "Scan Invoice",
           tabBarIcon: ({ color, focused }) => (
-            <TabPill color={color} colors={colors} focused={focused} icon="camera.fill" label="Scan" primary />
+            <TabPill
+              color={color}
+              colors={colors}
+              focused={focused}
+              icon="camera.fill"
+              label="Scan"
+              primary
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          headerTitle: 'Settings',
+          title: "Settings",
+          headerTitle: "Settings",
           tabBarIcon: ({ color, focused }) => (
-            <TabPill color={color} colors={colors} focused={focused} icon="gearshape.fill" label="Settings" />
+            <TabPill
+              color={color}
+              colors={colors}
+              focused={focused}
+              icon="gearshape.fill"
+              label="Settings"
+            />
           ),
         }}
       />

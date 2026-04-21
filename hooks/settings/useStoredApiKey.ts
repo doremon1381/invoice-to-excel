@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
-import { API_KEY_STORAGE_KEY } from '@/lib/constants';
+import { ANTHROPIC_API_KEY_STORAGE_KEY } from '@/lib/constants';
 
 export function useStoredApiKey() {
   const [apiKey, setApiKey] = useState('');
@@ -11,7 +11,7 @@ export function useStoredApiKey() {
     setIsLoading(true);
 
     try {
-      const storedValue = await SecureStore.getItemAsync(API_KEY_STORAGE_KEY);
+      const storedValue = await SecureStore.getItemAsync(ANTHROPIC_API_KEY_STORAGE_KEY);
       setApiKey(storedValue ?? '');
     } finally {
       setIsLoading(false);
@@ -22,12 +22,12 @@ export function useStoredApiKey() {
     const trimmedValue = value.trim();
 
     if (!trimmedValue) {
-      await SecureStore.deleteItemAsync(API_KEY_STORAGE_KEY);
+      await SecureStore.deleteItemAsync(ANTHROPIC_API_KEY_STORAGE_KEY);
       setApiKey('');
       return;
     }
 
-    await SecureStore.setItemAsync(API_KEY_STORAGE_KEY, trimmedValue);
+    await SecureStore.setItemAsync(ANTHROPIC_API_KEY_STORAGE_KEY, trimmedValue);
     setApiKey(trimmedValue);
   }, []);
 

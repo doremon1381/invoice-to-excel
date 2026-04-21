@@ -5,7 +5,17 @@ import { useThemeColor } from '@/hooks/theme/use-theme-color';
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
-  type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
+  type?:
+    | 'default'
+    | 'title'
+    | 'defaultSemiBold'
+    | 'subtitle'
+    | 'link'
+    | 'display'
+    | 'heading'
+    | 'body'
+    | 'caption'
+    | 'overline';
 };
 
 export function ThemedText({
@@ -15,17 +25,20 @@ export function ThemedText({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'foreground');
+  const linkColor = useThemeColor({}, 'accent');
 
   return (
     <Text
       style={[
         { color },
-        type === 'default' ? styles.default : undefined,
-        type === 'title' ? styles.title : undefined,
+        type === 'default' || type === 'body' ? styles.body : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        type === 'title' || type === 'display' ? styles.display : undefined,
+        type === 'subtitle' || type === 'heading' ? styles.heading : undefined,
+        type === 'caption' ? styles.caption : undefined,
+        type === 'overline' ? styles.overline : undefined,
+        type === 'link' ? [styles.link, { color: linkColor }] : undefined,
         style,
       ]}
       {...rest}
@@ -34,7 +47,7 @@ export function ThemedText({
 }
 
 const styles = StyleSheet.create({
-  default: {
+  body: {
     fontSize: 16,
     lineHeight: 24,
   },
@@ -43,18 +56,29 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '600',
   },
-  title: {
+  display: {
     fontSize: 32,
     fontWeight: 'bold',
     lineHeight: 32,
   },
-  subtitle: {
+  heading: {
     fontSize: 20,
     fontWeight: 'bold',
+    lineHeight: 26,
+  },
+  caption: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  overline: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   link: {
     lineHeight: 30,
     fontSize: 16,
-    color: '#0a7ea4',
   },
 });

@@ -171,16 +171,16 @@ export default function InvoiceDetailScreen() {
         </View>
 
         <View className="mt-6 rounded-3xl border p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-          <ThemedText type="subtitle">OCR Details</ThemedText>
+          <ThemedText type="subtitle">Extraction details</ThemedText>
           <ThemedText className="mt-2" style={{ color: colors.muted }}>
             {invoice.status === 'success'
-              ? 'Structured invoice fields were derived from OCR text. Review the captured text below if you need to audit the result.'
-              : 'OCR text was captured, but structured extraction is still limited for this invoice.'}
+              ? 'Structured fields came from the AI response. Review the raw model output below if you need to audit the result.'
+              : 'Raw model output was stored, but structured extraction is still limited for this invoice.'}
           </ThemedText>
           <View className="mt-4 rounded-2xl border p-4" style={{ backgroundColor: colors.background, borderColor: colors.border }}>
-            <ThemedText type="defaultSemiBold">Captured OCR text</ThemedText>
+            <ThemedText type="defaultSemiBold">Raw extraction text</ThemedText>
             <ThemedText className="mt-2" style={{ color: colors.muted, fontSize: 13 }}>
-              {invoice.raw_text?.trim() ? invoice.raw_text : 'No OCR text was stored for this invoice.'}
+              {invoice.raw_text?.trim() ? invoice.raw_text : 'No extraction text was stored for this invoice.'}
             </ThemedText>
           </View>
         </View>

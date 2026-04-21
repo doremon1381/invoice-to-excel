@@ -1,19 +1,21 @@
 import { useRouter } from 'expo-router';
-import { Alert, Image, ScrollView, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 
-import { LoadingOverlay } from '@/components/scan/LoadingOverlay';
-import { ScanButton } from '@/components/scan/ScanButton';
 import { ThemedText } from '@/components/shared/themed-text';
 import { ThemedView } from '@/components/shared/themed-view';
+import { IconSymbol } from '@/components/shared/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useInvoiceScan } from '@/hooks/scan/useInvoiceScan';
-import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
 export default function ScanScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-  const { error, isLoading, pickFromLibrary, previewUri, setError, takePhoto } = useInvoiceScan();
+  const colors = Colors.dark;
+  const { error, isLoading, pickFromLibrary, previewData, previewUri, setError, takePhoto } = useInvoiceScan();
+  const summaryVendor = previewData?.extracted.vendor_name ?? null;
+  const summaryDate = previewData?.extracted.invoice_date ?? null;
+  const summaryTotal = previewData?.extracted.total_amount;
+  const summaryStatus = error ? 'error' : isLoading ? 'reading' : previewData?.status ?? (previewUri ? 'ready' : 'idle');
+  const summarySnippet = previewData?.rawText?.slice(0, 42)?.replace(/\s+/g, ' ');
 
   async function handleScanAction(
     action: () => Promise<{ invoiceId: number; imageUri: string } | null>,
@@ -22,12 +24,11 @@ export default function ScanScreen() {
   ) {
     try {
       const result = await action();
-
       if (result) {
         router.push(`/invoice/${result.invoiceId}`);
       }
     } catch (caughtError) {
-      Alert.alert(errorTitle, caughtError instanceof Error ? caughtError.message : fallbackMessage);
+      //Alert.alert(errorTitle, caughtError instanceof Error ? caughtError.message : fallbackMessage);
     }
   }
 
@@ -40,47 +41,116 @@ export default function ScanScreen() {
   }
 
   return (
-    <ThemedView className="flex-1" style={{ backgroundColor: colors.background }}>
-      <ScrollView contentContainerClassName="px-5 pb-8 pt-4">
-        <View className="gap-2">
-          <ThemedText type="title">Scan invoice</ThemedText>
-          <ThemedText style={{ color: colors.muted }}>
-            Capture or import an invoice image, send it to your PaddleOCR Docker server, and store the detected text locally.
+    <ThemedView className="flex-1" style={{ backgroundColor: colors.background, paddingBottom: 80 }}>
+      <View className="flex-1 px-5 pb-10 pt-4">
+        <View className="flex-row items-center justify-between">
+          <Pressable
+            className="h-10 w-10 items-center justify-center rounded-full"
+            onPress={() => router.back()}
+            style={({ pressed }) => ({ backgroundColor: colors.card, opacity: pressed ? 0.8 : 1 })}>
+            <IconSymbol name="chevron.left" size={18} color={colors.text} />
+          </Pressable>
+
+          <ThemedText style={{ color: colors.tint, fontSize: 18, fontWeight: '700' }}>
+            {isLoading ? 'TRANSLATING...' : 'READY TO SCAN'}
           </ThemedText>
+
+          <Pressable
+            className="h-10 w-10 items-center justify-center rounded-full"
+            onPress={() => router.push('/settings')}
+            style={({ pressed }) => ({ backgroundColor: colors.card, opacity: pressed ? 0.8 : 1 })}>
+            <IconSymbol name="gearshape.fill" size={18} color={colors.text} />
+          </Pressable>
         </View>
 
-        <View className="mt-6 gap-3">
-          <ScanButton label="Take Photo" onPress={handleTakePhoto} />
-          <ScanButton label="Choose from Gallery" onPress={handlePickImage} />
-        </View>
-
-        {previewUri ? (
-          <View className="mt-6 rounded-3xl border p-3" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-            <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
-              Preview
-            </ThemedText>
-            <Image source={{ uri: previewUri }} className="aspect-square w-full rounded-2xl" style={{ borderColor: colors.border }} />
+        <View className="mt-6 flex-1 items-center justify-center">
+          <View
+            className="w-full max-w-[360px] rounded-[30px] border p-3"
+            style={{ backgroundColor: '#232D40', borderColor: colors.border }}>
+            {previewUri ? (
+              <Image source={{ uri: previewUri }} className="aspect-[3/4] w-full rounded-[24px]" resizeMode="cover" />
+            ) : (
+              <View className="aspect-[3/4] w-full items-center justify-center rounded-[24px]" style={{ backgroundColor: '#1A2233' }}>
+                <IconSymbol name="camera.fill" size={42} color={colors.icon} />
+                <ThemedText className="mt-4" style={{ color: colors.muted }}>
+                  Capture or import an invoice to extract with AI.
+                </ThemedText>
+              </View>
+            )}
           </View>
-        ) : null}
 
-        <View className="mt-6 rounded-3xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-          <ThemedText type="defaultSemiBold">Current OCR setup</ThemedText>
-          <ThemedText className="mt-2" style={{ color: colors.muted }}>
-            Anthropic extraction is preserved in the codebase for later, but the active scan flow now uses the PaddleOCR Docker server only.
-          </ThemedText>
+          <View
+            className="absolute bottom-10 right-2 w-[220px] rounded-[24px] border px-4 py-4"
+            style={{ backgroundColor: 'rgba(17, 24, 38, 0.94)', borderColor: '#32415D' }}>
+            <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>EXTRACTION SUMMARY</ThemedText>
+            <View className="mt-3 gap-2">
+              <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
+                {`"vendor": ${summaryVendor ? `"${summaryVendor}"` : 'null'}`}
+              </ThemedText>
+              <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
+                {`"date": ${summaryDate ? `"${summaryDate}"` : 'null'}`}
+              </ThemedText>
+              <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
+                {`"total": ${summaryTotal !== null && summaryTotal !== undefined ? `"${summaryTotal.toFixed(2)} ${previewData?.extracted.currency ?? 'VND'}"` : 'null'}`}
+              </ThemedText>
+              <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
+                {`"status": "${summaryStatus}"`}
+              </ThemedText>
+              {!summaryVendor && summarySnippet ? (
+                <ThemedText style={{ color: colors.muted, fontSize: 11 }}>
+                  {`"text": "${summarySnippet}${previewData?.rawText.length && previewData.rawText.length > 42 ? '…' : ''}"`}
+                </ThemedText>
+              ) : null}
+            </View>
+          </View>
         </View>
 
         {error ? (
-          <View className="mt-6 rounded-3xl border p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+          <View className="mb-5 rounded-[24px] border px-4 py-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
             <ThemedText style={{ color: colors.danger }}>{error}</ThemedText>
-            <View className="mt-3">
-              <ScanButton label="Clear error" onPress={() => setError(null)} />
-            </View>
           </View>
         ) : null}
-      </ScrollView>
 
-      {isLoading ? <LoadingOverlay message="Reading invoice text…" /> : null}
+        <View className="flex-row items-end justify-between gap-5">
+          <Pressable
+            className="h-14 w-14 items-center justify-center rounded-2xl border"
+            onPress={() => void handlePickImage()}
+            style={({ pressed }) => ({
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: pressed ? 0.85 : 1,
+            })}>
+            {previewUri ? (
+              <Image source={{ uri: previewUri }} className="h-10 w-10 rounded-xl" resizeMode="cover" />
+            ) : (
+              <IconSymbol name="square.and.arrow.up.fill" size={22} color={colors.text} />
+            )}
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            className="h-24 w-24 items-center justify-center rounded-full border-[6px]"
+            onPress={() => void handleTakePhoto()}
+            style={({ pressed }) => ({
+              backgroundColor: '#77AFFF',
+              borderColor: '#C5DCFF',
+              opacity: pressed ? 0.9 : 1,
+            })}>
+            <View className="h-16 w-16 rounded-full border-2" style={{ borderColor: '#E8F1FF' }} />
+          </Pressable>
+
+          <Pressable
+            className="h-14 w-14 items-center justify-center rounded-full border"
+            onPress={() => setError(null)}
+            style={({ pressed }) => ({
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: pressed ? 0.85 : 1,
+            })}>
+            <IconSymbol name="arrow.clockwise" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+      </View>
     </ThemedView>
   );
 }

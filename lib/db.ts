@@ -1,6 +1,6 @@
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from "expo-sqlite";
 
-import { DEFAULT_CURRENCY } from '@/lib/constants';
+import { DEFAULT_CURRENCY } from "@/lib/constants";
 import type {
   ExtractedInvoice,
   InvoiceDetail,
@@ -8,21 +8,32 @@ import type {
   InvoiceRow,
   LineItem,
   SaveInvoiceInput,
-} from '@/lib/types';
+} from "@/lib/types";
 
-const database = SQLite.openDatabaseSync('invoices.db');
+import { Platform } from "react-native";
 
-function mapInvoiceListItem(row: Record<string, SQLite.SQLiteBindValue>): InvoiceListItem {
+// Only use SQLite on native, not web
+const database =
+  Platform.OS !== "web" ? SQLite.openDatabaseSync("invoices.db") : null;
+
+function mapInvoiceListItem(
+  row: Record<string, SQLite.SQLiteBindValue>,
+): InvoiceListItem {
   return {
     id: Number(row.id),
     image_uri: String(row.image_uri),
     raw_text: row.raw_text ? String(row.raw_text) : null,
     scanned_at: String(row.scanned_at),
-    status: String(row.status) as InvoiceListItem['status'],
+    status: String(row.status) as InvoiceListItem["status"],
     vendor_name: row.vendor_name ? String(row.vendor_name) : null,
     invoice_number: row.invoice_number ? String(row.invoice_number) : null,
     invoice_date: row.invoice_date ? String(row.invoice_date) : null,
-    total_amount: typeof row.total_amount === 'number' ? row.total_amount : row.total_amount ? Number(row.total_amount) : null,
+    total_amount:
+      typeof row.total_amount === "number"
+        ? row.total_amount
+        : row.total_amount
+          ? Number(row.total_amount)
+          : null,
     currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
   };
 }
@@ -31,16 +42,31 @@ function mapLineItem(row: Record<string, SQLite.SQLiteBindValue>): LineItem {
   return {
     id: Number(row.id),
     invoice_id: Number(row.invoice_id),
-    description: row.description ? String(row.description) : '',
-    quantity: typeof row.quantity === 'number' ? row.quantity : row.quantity ? Number(row.quantity) : null,
+    description: row.description ? String(row.description) : "",
+    quantity:
+      typeof row.quantity === "number"
+        ? row.quantity
+        : row.quantity
+          ? Number(row.quantity)
+          : null,
     unit: row.unit ? String(row.unit) : null,
-    unit_price: typeof row.unit_price === 'number' ? row.unit_price : row.unit_price ? Number(row.unit_price) : null,
-    total_price: typeof row.total_price === 'number' ? row.total_price : row.total_price ? Number(row.total_price) : null,
+    unit_price:
+      typeof row.unit_price === "number"
+        ? row.unit_price
+        : row.unit_price
+          ? Number(row.unit_price)
+          : null,
+    total_price:
+      typeof row.total_price === "number"
+        ? row.total_price
+        : row.total_price
+          ? Number(row.total_price)
+          : null,
   };
 }
 
 export async function initializeDatabase(): Promise<void> {
-  await database.execAsync(`
+  await database?.execAsync(`
     PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS invoices (
@@ -83,15 +109,15 @@ export async function initializeDatabase(): Promise<void> {
 export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   await initializeDatabase();
 
-  const createdInvoice = await database.runAsync(
-    'INSERT INTO invoices (image_uri, raw_text, status) VALUES (?, ?, ?)',
+  const createdInvoice = await database?.runAsync(
+    "INSERT INTO invoices (image_uri, raw_text, status) VALUES (?, ?, ?)",
     [input.imageUri, input.rawText, input.status],
   );
 
-  const invoiceId = Number(createdInvoice.lastInsertRowId);
+  const invoiceId = Number(createdInvoice?.lastInsertRowId);
   const extracted = input.extracted;
 
-  await database.runAsync(
+  await database?.runAsync(
     `INSERT INTO invoice_data (
       invoice_id,
       vendor_name,
@@ -125,9 +151,16 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   );
 
   for (const item of extracted.line_items) {
-    await database.runAsync(
-      'INSERT INTO line_items (invoice_id, description, quantity, unit_price, unit, total_price) VALUES (?, ?, ?, ?, ?, ?)',
-      [invoiceId, item.description, item.quantity, item.unit_price, item.unit, item.total_price],
+    await database?.runAsync(
+      "INSERT INTO line_items (invoice_id, description, quantity, unit_price, unit, total_price) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        invoiceId,
+        item.description,
+        item.quantity,
+        item.unit_price,
+        item.unit,
+        item.total_price,
+      ],
     );
   }
 
@@ -137,7 +170,9 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
 export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
   await initializeDatabase();
 
-  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(`
+  const rows = await database?.getAllAsync<
+    Record<string, SQLite.SQLiteBindValue>
+  >(`
     SELECT
       invoices.id,
       invoices.image_uri,
@@ -154,13 +189,17 @@ export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
     ORDER BY invoices.scanned_at DESC
   `);
 
-  return rows.map(mapInvoiceListItem);
+  return rows?.map(mapInvoiceListItem) ?? [];
 }
 
-export async function getInvoiceById(invoiceId: number): Promise<InvoiceDetail> {
+export async function getInvoiceById(
+  invoiceId: number,
+): Promise<InvoiceDetail> {
   await initializeDatabase();
 
-  const row = await database.getFirstAsync<Record<string, SQLite.SQLiteBindValue>>(
+  const row = await database?.getFirstAsync<
+    Record<string, SQLite.SQLiteBindValue>
+  >(
     `SELECT
       invoices.id,
       invoices.image_uri,
@@ -187,7 +226,7 @@ export async function getInvoiceById(invoiceId: number): Promise<InvoiceDetail> 
   );
 
   if (!row) {
-    throw new Error('Invoice not found.');
+    throw new Error("Invoice not found.");
   }
 
   const lineItems = await getLineItems(invoiceId);
@@ -197,16 +236,36 @@ export async function getInvoiceById(invoiceId: number): Promise<InvoiceDetail> 
     image_uri: String(row.image_uri),
     raw_text: row.raw_text ? String(row.raw_text) : null,
     scanned_at: String(row.scanned_at),
-    status: String(row.status) as InvoiceRow['status'],
+    status: String(row.status) as InvoiceRow["status"],
     vendor_name: row.vendor_name ? String(row.vendor_name) : null,
     vendor_address: row.vendor_address ? String(row.vendor_address) : null,
     invoice_number: row.invoice_number ? String(row.invoice_number) : null,
     invoice_date: row.invoice_date ? String(row.invoice_date) : null,
     due_date: row.due_date ? String(row.due_date) : null,
-    subtotal: typeof row.subtotal === 'number' ? row.subtotal : row.subtotal ? Number(row.subtotal) : null,
-    tax_amount: typeof row.tax_amount === 'number' ? row.tax_amount : row.tax_amount ? Number(row.tax_amount) : null,
-    discount_amount: typeof row.discount_amount === 'number' ? row.discount_amount : row.discount_amount ? Number(row.discount_amount) : null,
-    total_amount: typeof row.total_amount === 'number' ? row.total_amount : row.total_amount ? Number(row.total_amount) : null,
+    subtotal:
+      typeof row.subtotal === "number"
+        ? row.subtotal
+        : row.subtotal
+          ? Number(row.subtotal)
+          : null,
+    tax_amount:
+      typeof row.tax_amount === "number"
+        ? row.tax_amount
+        : row.tax_amount
+          ? Number(row.tax_amount)
+          : null,
+    discount_amount:
+      typeof row.discount_amount === "number"
+        ? row.discount_amount
+        : row.discount_amount
+          ? Number(row.discount_amount)
+          : null,
+    total_amount:
+      typeof row.total_amount === "number"
+        ? row.total_amount
+        : row.total_amount
+          ? Number(row.total_amount)
+          : null,
     currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
     payment_method: row.payment_method ? String(row.payment_method) : null,
     notes: row.notes ? String(row.notes) : null,
@@ -217,22 +276,26 @@ export async function getInvoiceById(invoiceId: number): Promise<InvoiceDetail> 
 export async function getLineItems(invoiceId: number): Promise<LineItem[]> {
   await initializeDatabase();
 
-  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
-    'SELECT id, invoice_id, description, quantity, unit_price, unit, total_price FROM line_items WHERE invoice_id = ? ORDER BY id ASC',
+  const rows = await database?.getAllAsync<
+    Record<string, SQLite.SQLiteBindValue>
+  >(
+    "SELECT id, invoice_id, description, quantity, unit_price, unit, total_price FROM line_items WHERE invoice_id = ? ORDER BY id ASC",
     [invoiceId],
   );
 
-  return rows.map(mapLineItem);
+  return rows?.map(mapLineItem) ?? [];
 }
 
 export async function deleteInvoice(invoiceId: number): Promise<void> {
   await initializeDatabase();
-  await database.runAsync('DELETE FROM invoices WHERE id = ?', [invoiceId]);
+  await database?.runAsync("DELETE FROM invoices WHERE id = ?", [invoiceId]);
 }
 
 export async function getInvoiceCount(): Promise<number> {
   await initializeDatabase();
-  const result = await database.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM invoices');
+  const result = await database?.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM invoices",
+  );
   return result?.count ?? 0;
 }
 

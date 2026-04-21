@@ -1,67 +1,99 @@
 import {
-  ANTHROPIC_API_URL,
+  ANTHROPIC_API_KEY,
+  ANTHROPIC_BASE_URL,
   ANTHROPIC_MODEL,
-  ANTHROPIC_VERSION,
   EXTRACTION_PROMPT,
   MAX_ANTHROPIC_TOKENS,
-} from '@/lib/constants';
-import { parseExtractedJSON } from '@/lib/parser';
-import type { ExtractedInvoice } from '@/lib/types';
+} from "@/lib/constants";
+import { parseExtractedJSON } from "@/lib/parser";
+import type { ExtractedInvoice } from "@/lib/types";
 
-interface AnthropicResponse {
-  content?: Array<{
-    type?: string;
-    text?: string;
-  }>;
+interface OpenAIChatCompletionResponse {
+  choices?: {
+    message?: {
+      content?: string | { type?: string; text?: string }[];
+    };
+  }[];
 }
 
-export async function extractInvoiceData(
-  imageBase64: string,
-  mimeType: string,
-  apiKey: string,
-): Promise<{ extracted: ExtractedInvoice; rawText: string }> {
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
+function extractMessageText(data: OpenAIChatCompletionResponse): string {
+  const content = data.choices?.[0]?.message?.content;
+
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .filter((item) => item.type === "text" && typeof item.text === "string")
+      .map((item) => item.text)
+      .join("\n");
+  }
+
+  return "";
+}
+
+async function callChatCompletions(content: unknown): Promise<string> {
+  const endpoint = `${ANTHROPIC_BASE_URL}/v1/chat/completions`;
+
+  console.log("debug - start callChatCompletions");
+  console.log("debug - request endpoint", endpoint);
+
+  const response = await fetch(endpoint, {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ANTHROPIC_API_KEY}`,
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
       max_tokens: MAX_ANTHROPIC_TOKENS,
+      temperature: 0,
       messages: [
         {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType,
-                data: imageBase64,
-              },
-            },
-            {
-              type: 'text',
-              text: EXTRACTION_PROMPT,
-            },
-          ],
+          role: "user",
+          content,
         },
       ],
     }),
+    signal: AbortSignal.timeout(15000),
   });
 
+  console.log("debug - response status", response.status);
+
   if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`OpenAI-style API error ${response.status}: ${errorText}`);
   }
 
-  const data = (await response.json()) as AnthropicResponse;
-  const text = data.content?.[0]?.text ?? '';
+  const data = (await response.json()) as OpenAIChatCompletionResponse;
+  const text = extractMessageText(data);
 
   if (!text) {
-    throw new Error('Anthropic API returned an empty response.');
+    throw new Error("OpenAI-style API returned an empty response.");
   }
+
+  return text;
+}
+
+export async function extractInvoiceData(
+  imageBase64: string,
+  mimeType: "image/jpeg" | "image/png" | "image/webp",
+): Promise<{ extracted: ExtractedInvoice; rawText: string }> {
+  const text = await callChatCompletions([
+    {
+      type: "text",
+      text: EXTRACTION_PROMPT,
+    },
+    {
+      type: "image_url",
+      image_url: {
+        url: `data:${mimeType};base64,${imageBase64}`,
+      },
+    },
+  ]);
+
+  console.log("debug - extracted text length", text.length);
 
   return {
     extracted: parseExtractedJSON(text),
@@ -69,32 +101,34 @@ export async function extractInvoiceData(
   };
 }
 
-export async function testAnthropicConnection(apiKey: string): Promise<void> {
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 32,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Reply with the word ok.',
-            },
-          ],
-        },
-      ],
-    }),
-  });
+export async function checkAPIHealth(): Promise<boolean> {
+  try {
+    const response = await fetch(`${ANTHROPIC_BASE_URL}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ANTHROPIC_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 16,
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: "Reply with ok.",
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status}`);
+    return response.ok;
+  } catch {
+    return false;
   }
+}
+
+export async function listModels(): Promise<string[]> {
+  return [ANTHROPIC_MODEL];
 }

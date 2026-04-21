@@ -164,27 +164,27 @@ function scoreExtraction(extracted: ExtractedInvoice): InvoiceStatus {
   return score >= 2 ? 'success' : 'pending';
 }
 
-export function parseExtractedJSON(rawText: string): ExtractedInvoice {
-  const jsonText = extractJsonObject(rawText);
-  const parsedValue = JSON.parse(jsonText) as Record<string, unknown>;
-  const lineItems = Array.isArray(parsedValue.line_items) ? parsedValue.line_items.map(normalizeLineItem) : [];
+// export function parseExtractedJSON(rawText: string): ExtractedInvoice {
+//   const jsonText = extractJsonObject(rawText);
+//   const parsedValue = JSON.parse(jsonText) as Record<string, unknown>;
+//   const lineItems = Array.isArray(parsedValue.line_items) ? parsedValue.line_items.map(normalizeLineItem) : [];
 
-  return {
-    vendor_name: normalizeNullableString(parsedValue.vendor_name),
-    vendor_address: normalizeNullableString(parsedValue.vendor_address),
-    invoice_number: normalizeNullableString(parsedValue.invoice_number),
-    invoice_date: normalizeNullableString(parsedValue.invoice_date),
-    due_date: normalizeNullableString(parsedValue.due_date),
-    subtotal: normalizeNullableNumber(parsedValue.subtotal),
-    tax_amount: normalizeNullableNumber(parsedValue.tax_amount),
-    discount_amount: normalizeNullableNumber(parsedValue.discount_amount),
-    total_amount: normalizeNullableNumber(parsedValue.total_amount),
-    currency: normalizeNullableString(parsedValue.currency) ?? DEFAULT_CURRENCY,
-    payment_method: normalizeNullableString(parsedValue.payment_method),
-    notes: normalizeNullableString(parsedValue.notes),
-    line_items: lineItems,
-  };
-}
+//   return {
+//     vendor_name: normalizeNullableString(parsedValue.vendor_name),
+//     vendor_address: normalizeNullableString(parsedValue.vendor_address),
+//     invoice_number: normalizeNullableString(parsedValue.invoice_number),
+//     invoice_date: normalizeNullableString(parsedValue.invoice_date),
+//     due_date: normalizeNullableString(parsedValue.due_date),
+//     subtotal: normalizeNullableNumber(parsedValue.subtotal),
+//     tax_amount: normalizeNullableNumber(parsedValue.tax_amount),
+//     discount_amount: normalizeNullableNumber(parsedValue.discount_amount),
+//     total_amount: normalizeNullableNumber(parsedValue.total_amount),
+//     currency: normalizeNullableString(parsedValue.currency) ?? DEFAULT_CURRENCY,
+//     payment_method: normalizeNullableString(parsedValue.payment_method),
+//     notes: normalizeNullableString(parsedValue.notes),
+//     line_items: lineItems,
+//   };
+// }
 
 export function parseOcrText(rawText: string): { extracted: ExtractedInvoice; status: InvoiceStatus } {
   const lines = rawText
@@ -219,3 +219,18 @@ export function parseOcrText(rawText: string): { extracted: ExtractedInvoice; st
 }
 
 export { normalizeNullableNumber, normalizeNullableString };
+// lib/parser.ts
+export function parseExtractedJSON(raw: string): ExtractedInvoice {
+  // Strip markdown code fences if model adds them despite instructions
+  const cleaned = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as ExtractedInvoice;
+  } catch {
+    throw new Error(`Failed to parse model response as JSON:\n${cleaned}`);
+  }
+}

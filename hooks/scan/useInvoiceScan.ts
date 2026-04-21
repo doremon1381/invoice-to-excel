@@ -1,55 +1,117 @@
-import { useCallback, useState } from 'react';
+import * as FileSystem from 'expo-file-system/legacy';
+import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset, MediaTypeOptions } from 'expo-image-picker';
+import { useCallback, useState } from 'react';
 
-// import { extractInvoiceData } from '@/lib/anthropic';
+import { extractInvoiceData } from '@/lib/anthropic';
+import { ANTHROPIC_API_KEY, IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH } from '@/lib/constants';
 import { saveInvoice } from '@/lib/db';
-import { runPaddleOCR } from '@/lib/ocr';
-import { parseOcrText } from '@/lib/parser';
-import { Storage } from '@/lib/storage';
+import type { ExtractedInvoice, InvoiceStatus } from '@/lib/types';
+
+async function prepareImage(asset: ImagePickerAsset): Promise<{ uri: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp'; base64: string }> {
+  const manipulated = await manipulateAsync(
+    asset.uri,
+    [{ resize: { width: IMAGE_MAX_WIDTH } }],
+    {
+      compress: IMAGE_COMPRESS_QUALITY,
+      format: SaveFormat.JPEG,
+      base64: false,
+    },
+  );
+
+  const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  return {
+    uri: manipulated.uri,
+    mimeType: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg',
+    base64,
+  };
+}
+
+function deriveStatus(extracted: ExtractedInvoice): InvoiceStatus {
+  const score = [
+    extracted.vendor_name,
+    extracted.invoice_number,
+    extracted.invoice_date,
+    extracted.total_amount,
+  ].filter((value) => value !== null).length;
+
+  return score >= 2 ? 'success' : 'pending';
+}
+
+function deriveRawText(extracted: ExtractedInvoice, rawText: string): string {
+  return rawText.trim() || extracted.notes?.trim() || '';
+}
+
+export interface ScanPreviewData {
+  extracted: ExtractedInvoice;
+  rawText: string;
+  status: InvoiceStatus;
+}
 
 interface ScanResult {
   invoiceId: number;
   imageUri: string;
 }
 
+function toPreviewData(extracted: ExtractedInvoice, rawText: string, status: InvoiceStatus): ScanPreviewData {
+  return {
+    extracted,
+    rawText: deriveRawText(extracted, rawText),
+    status,
+  };
+}
+
+function getTestingApiKey(): string {
+  return ANTHROPIC_API_KEY;
+}
+
 export function useInvoiceScan() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<ScanPreviewData | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   const processAsset = useCallback(async (asset: ImagePickerAsset): Promise<ScanResult> => {
-    const serverUrl = await Storage.getOCRServerUrl();
+    const apiKey = getTestingApiKey();
 
-    if (!serverUrl) {
-      throw new Error('Please save your PaddleOCR server URL before scanning.');
+    if (!apiKey) {
+      throw new Error('Anthropic test API key is not configured.');
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      setPreviewUri(asset.uri);
-      const ocrResult = await runPaddleOCR(asset.uri, serverUrl);
+      const preparedImage = await prepareImage(asset);
+      setPreviewUri(preparedImage.uri);
 
-      if (!ocrResult.full_text.trim()) {
-        throw new Error('No text was found in the invoice image. Try a clearer photo.');
-      }
+      //Alert.alert('debug - preparedImage', preparedImage.toString());
+      const { extracted, rawText } = await extractInvoiceData(preparedImage.base64, preparedImage.mimeType);
 
-      const { extracted, status } = parseOcrText(ocrResult.full_text);
+      //Alert.alert('debug - extracted', extracted.toString());
+      //Alert.alert('debug - rawText', rawText.toString());
+
+      const status = deriveStatus(extracted);
+      setPreviewData(toPreviewData(extracted, rawText, status));
+
       const invoiceId = await saveInvoice({
-        imageUri: asset.uri,
-        rawText: ocrResult.full_text,
+        imageUri: preparedImage.uri,
+        rawText: deriveRawText(extracted, rawText),
         status,
         extracted,
       });
 
       return {
         invoiceId,
-        imageUri: asset.uri,
+        imageUri: preparedImage.uri,
       };
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Failed to scan invoice.';
+      setPreviewData(null);
       setError(message);
       throw new Error(message);
     } finally {
@@ -101,6 +163,7 @@ export function useInvoiceScan() {
     error,
     isLoading,
     pickFromLibrary,
+    previewData,
     previewUri,
     setError,
     takePhoto,

@@ -19,9 +19,11 @@ const MAPPING = {
   'gearshape.fill': 'settings',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
+  'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
   'square.and.arrow.up.fill': 'ios-share',
   'trash.fill': 'delete',
+  'arrow.clockwise': 'refresh',
 } as IconMapping;
 
 /**
