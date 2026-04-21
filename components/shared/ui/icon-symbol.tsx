@@ -14,6 +14,11 @@ type IconSymbolName = keyof typeof MAPPING;
  * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
 const MAPPING = {
+  xmark: 'close',
+  pencil: 'edit',
+  calendar: 'event',
+  'chevron.up': 'keyboard-arrow-up',
+  'chevron.down': 'keyboard-arrow-down',
   'house.fill': 'home',
   'camera.fill': 'photo-camera',
   'gearshape.fill': 'settings',

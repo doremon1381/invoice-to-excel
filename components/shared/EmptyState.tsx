@@ -16,7 +16,7 @@ export function EmptyState({ title, description }: EmptyStateProps) {
   return (
     <View
       className="mt-6 rounded-3xl border px-6 py-8"
-      style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+      style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
       <ThemedText type="subtitle" style={{ marginBottom: 8, textAlign: 'center' }}>
         {title}
       </ThemedText>

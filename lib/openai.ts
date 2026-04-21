@@ -1,9 +1,10 @@
 import {
-  ANTHROPIC_API_KEY,
-  ANTHROPIC_BASE_URL,
-  ANTHROPIC_MODEL,
   EXTRACTION_PROMPT,
-  MAX_ANTHROPIC_TOKENS,
+  OPENAI_API_KEY,
+  OPENAI_BASE_URL,
+  OPENAI_EFFORT_LEVEL_LOW,
+  OPENAI_EFFORT_LEVEL_MAX,
+  OPENAI_MODEL,
 } from "@/lib/constants";
 import { parseExtractedJSON } from "@/lib/parser";
 import type { ExtractedInvoice } from "@/lib/types";
@@ -34,7 +35,7 @@ function extractMessageText(data: OpenAIChatCompletionResponse): string {
 }
 
 async function callChatCompletions(content: unknown): Promise<string> {
-  const endpoint = `${ANTHROPIC_BASE_URL}/v1/chat/completions`;
+  const endpoint = `${OPENAI_BASE_URL}/v1/chat/completions`;
 
   console.log("debug - start callChatCompletions");
   console.log("debug - request endpoint", endpoint);
@@ -43,11 +44,12 @@ async function callChatCompletions(content: unknown): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${ANTHROPIC_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: MAX_ANTHROPIC_TOKENS,
+      model: OPENAI_MODEL,
+      //max_tokens: MAX_OPENAI_TOKENS, // TODO: uncomment this when we have a way to estimate the number of tokens
+      effort: OPENAI_EFFORT_LEVEL_MAX,
       temperature: 0,
       messages: [
         {
@@ -56,21 +58,20 @@ async function callChatCompletions(content: unknown): Promise<string> {
         },
       ],
     }),
-    signal: AbortSignal.timeout(15000),
   });
 
   console.log("debug - response status", response.status);
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI-style API error ${response.status}: ${errorText}`);
+    throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
   }
 
   const data = (await response.json()) as OpenAIChatCompletionResponse;
   const text = extractMessageText(data);
 
   if (!text) {
-    throw new Error("OpenAI-style API returned an empty response.");
+    throw new Error("OpenAI API returned an empty response.");
   }
 
   return text;
@@ -103,15 +104,16 @@ export async function extractInvoiceData(
 
 export async function checkAPIHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${ANTHROPIC_BASE_URL}/v1/chat/completions`, {
+    const response = await fetch(`${OPENAI_BASE_URL}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${ANTHROPIC_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 16,
+        model: OPENAI_MODEL,
+        //max_tokens: 16, // TODO: uncomment this when we have a way to estimate the number of tokens
+        effort: OPENAI_EFFORT_LEVEL_LOW,
         temperature: 0,
         messages: [
           {
@@ -130,5 +132,5 @@ export async function checkAPIHealth(): Promise<boolean> {
 }
 
 export async function listModels(): Promise<string[]> {
-  return [ANTHROPIC_MODEL];
+  return [OPENAI_MODEL];
 }

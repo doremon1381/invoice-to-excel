@@ -31,7 +31,7 @@ export function FinancialSummary({
   const colors = Colors[colorScheme];
 
   return (
-    <View className="rounded-3xl border p-5" style={{ borderColor: colors.border, backgroundColor: colors.card }}>
+    <View className="rounded-3xl border p-5" style={{ borderColor: colors.border, backgroundColor: colors.surface }}>
       <View className="gap-3">
         <SummaryRow label="Subtotal" value={formatCurrency(subtotal, currency)} />
         <SummaryRow label="Tax" value={formatCurrency(taxAmount, currency)} />

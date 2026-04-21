@@ -45,31 +45,48 @@ export function InvoiceCard({ invoice, onPress, onDelete }: InvoiceCardProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      className="mb-3 rounded-[28px] border px-4 py-4"
+      className="mb-3 rounded-[24px] border px-4 py-4"
+      onLongPress={onDelete}
+      delayLongPress={320}
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: colors.card,
+        backgroundColor: colors.surface,
         borderColor: colors.border,
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: colorScheme === "dark" ? 0.2 : 0.06,
+        shadowRadius: 8,
+        elevation: 2,
         opacity: pressed ? 0.94 : 1,
       })}>
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="flex-1 gap-1">
+      <View className="flex-row items-center gap-3">
+        <View className="flex-[1.5] gap-0.5">
           <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>
             {invoice.vendor_name ?? 'Unknown vendor'}
           </ThemedText>
           <ThemedText style={{ color: colors.muted, fontSize: 13 }}>
             {invoice.invoice_date ?? 'Unknown date'}
           </ThemedText>
-          <ThemedText style={{ color: colors.muted, fontSize: 13 }}>
-            Invoice #{invoice.invoice_number ?? 'N/A'}
+        </View>
+
+        <View className="min-w-[90px]">
+          <ThemedText style={{ color: colors.muted, fontSize: 12, fontWeight: '600' }}>
+            Total
+          </ThemedText>
+          <ThemedText
+            type="defaultSemiBold"
+            numberOfLines={1}
+            style={{ fontSize: 17 }}
+          >
+            {formatAmount(invoice.total_amount, invoice.currency)}
           </ThemedText>
         </View>
 
-        <View className="items-end gap-2">
+        <View className="flex-1 items-end gap-1">
           <View
-            className="h-7 w-7 items-center justify-center rounded-full"
+            className="h-6 w-6 items-center justify-center rounded-full"
             style={{ backgroundColor: badgeColor }}>
-            <ThemedText style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>✓</ThemedText>
+            <ThemedText style={{ color: colors.onAccent, fontSize: 11, fontWeight: '700' }}>✓</ThemedText>
           </View>
           <ThemedText
             style={{
@@ -81,19 +98,6 @@ export function InvoiceCard({ invoice, onPress, onDelete }: InvoiceCardProps) {
             {statusLabel}
           </ThemedText>
         </View>
-      </View>
-
-      <View className="mt-4 flex-row items-end justify-between gap-4 border-t pt-3" style={{ borderTopColor: colors.border }}>
-        <View className="gap-1">
-          <ThemedText style={{ color: colors.muted, fontSize: 12, fontWeight: '600' }}>Total</ThemedText>
-          <ThemedText type="subtitle" style={{ fontSize: 20 }}>
-            {formatAmount(invoice.total_amount, invoice.currency)}
-          </ThemedText>
-        </View>
-
-        <Pressable onPress={onDelete} style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}>
-          <ThemedText style={{ color: colors.danger, fontWeight: '600' }}>Delete</ThemedText>
-        </Pressable>
       </View>
     </Pressable>
   );

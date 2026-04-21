@@ -12,7 +12,7 @@ config.server = {
     return (req, res, next) => {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
       res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-      next(middleware);  // ← wrong, fix below
+      return middleware(req, res, next);
     };
   },
 };

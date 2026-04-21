@@ -1,11 +1,12 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { CameraView } from 'expo-camera';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset, MediaTypeOptions } from 'expo-image-picker';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type RefObject } from 'react';
 
-import { extractInvoiceData } from '@/lib/anthropic';
-import { ANTHROPIC_API_KEY, IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH } from '@/lib/constants';
+import { extractInvoiceData } from '@/lib/openai';
+import { IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH, OPENAI_API_KEY } from '@/lib/constants';
 import { saveInvoice } from '@/lib/db';
 import type { ExtractedInvoice, InvoiceStatus } from '@/lib/types';
 
@@ -65,8 +66,18 @@ function toPreviewData(extracted: ExtractedInvoice, rawText: string, status: Inv
   };
 }
 
+function cameraPictureToAsset(picture: { uri: string; width: number; height: number }): ImagePickerAsset {
+  return {
+    uri: picture.uri,
+    width: picture.width,
+    height: picture.height,
+    type: 'image',
+    mimeType: 'image/jpeg',
+  };
+}
+
 function getTestingApiKey(): string {
-  return ANTHROPIC_API_KEY;
+  return OPENAI_API_KEY;
 }
 
 export function useInvoiceScan() {
@@ -79,7 +90,7 @@ export function useInvoiceScan() {
     const apiKey = getTestingApiKey();
 
     if (!apiKey) {
-      throw new Error('Anthropic test API key is not configured.');
+      throw new Error('OpenAI test API key is not configured.');
     }
 
     setIsLoading(true);
@@ -159,7 +170,31 @@ export function useInvoiceScan() {
     return processAsset(result.assets[0]);
   }, [processAsset]);
 
+  const captureFromCamera = useCallback(
+    async (cameraRef: RefObject<InstanceType<typeof CameraView> | null>): Promise<ScanResult | null> => {
+      const camera = cameraRef.current;
+
+      if (!camera) {
+        throw new Error('Camera is not ready yet.');
+      }
+
+      const picture = await camera.takePictureAsync({ quality: 1, skipProcessing: false });
+      const asset = cameraPictureToAsset(picture);
+
+      return processAsset(asset);
+    },
+    [processAsset],
+  );
+
+  const clearScanPreview = useCallback(() => {
+    setPreviewUri(null);
+    setPreviewData(null);
+    setError(null);
+  }, []);
+
   return {
+    captureFromCamera,
+    clearScanPreview,
     error,
     isLoading,
     pickFromLibrary,

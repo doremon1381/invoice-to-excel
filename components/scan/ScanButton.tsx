@@ -21,10 +21,10 @@ export function ScanButton({ label, onPress, disabled = false }: ScanButtonProps
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: disabled ? colors.border : colors.tint,
+        backgroundColor: disabled ? colors.border : colors.accent,
         opacity: pressed ? 0.85 : 1,
       })}>
-      <ThemedText style={{ color: '#FFFFFF', fontWeight: '700' }}>{label}</ThemedText>
+      <ThemedText style={{ color: colors.onAccent, fontWeight: '700' }}>{label}</ThemedText>
     </Pressable>
   );
 }

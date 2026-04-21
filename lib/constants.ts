@@ -1,15 +1,19 @@
-export const ANTHROPIC_BASE_URL = "http://localhost:20128";
-export const ANTHROPIC_API_KEY = "sk-4c6db985c73f9042-bpx046-8a7caa4d";
-export const ANTHROPIC_MODEL = "gpt-5.2-codex";
-export const ANTHROPIC_EFFORT_LEVEL = "high";
-export const ANTHROPIC_AUTO_UPDATES_CHANNEL = "latest";
-export const ANTHROPIC_API_KEY_STORAGE_KEY = "anthropic_api_key";
-//export const ANTHROPIC_VERSION = '2023-06-01';
 export const DEFAULT_CURRENCY = "VND";
-export const IMAGE_MAX_WIDTH = 1200;
-export const IMAGE_COMPRESS_QUALITY = 0.8;
-export const EXPORT_HISTORY_STORAGE_KEY = "export_history";
-export const MAX_ANTHROPIC_TOKENS = 2048;
+
+export const IMAGE_MAX_WIDTH = 1600;
+export const IMAGE_COMPRESS_QUALITY = 0.85;
+
+export const EXPORT_HISTORY_STORAGE_KEY = "invoice_export_history_v1";
+export const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_secure_v1";
+
+export const OPENAI_BASE_URL = "http://localhost:20128";
+export const OPENAI_API_KEY = "sk-4c6db985c73f9042-bpx046-8a7caa4d";
+export const OPENAI_MODEL = "gemini-3-flash";
+export const OPENAI_EFFORT_LEVEL_MAX = "max";
+export const OPENAI_EFFORT_LEVEL_HIGH = "high";
+export const OPENAI_EFFORT_LEVEL_MEDIUM = "medium";
+export const OPENAI_EFFORT_LEVEL_LOW = "low";
+//export const MAX_OPENAI_TOKENS = 2048; // TODO: uncomment this when we have a way to estimate the number of tokens
 
 export const EXTRACTION_PROMPT = `You are a financial data extraction specialist. Analyze this invoice image and extract all financial information.
 

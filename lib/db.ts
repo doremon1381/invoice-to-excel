@@ -6,6 +6,7 @@ import type {
   InvoiceDetail,
   InvoiceListItem,
   InvoiceRow,
+  InvoiceStatus,
   LineItem,
   SaveInvoiceInput,
 } from "@/lib/types";
@@ -165,6 +166,69 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   }
 
   return invoiceId;
+}
+
+export async function updateInvoice(
+  invoiceId: number,
+  patch: {
+    extracted: ExtractedInvoice;
+    rawText?: string | null;
+    status?: InvoiceStatus;
+  },
+): Promise<void> {
+  await initializeDatabase();
+
+  if (Platform.OS === "web" || !database) {
+    return;
+  }
+
+  if (patch.rawText !== undefined) {
+    await database.runAsync("UPDATE invoices SET raw_text = ? WHERE id = ?", [
+      patch.rawText,
+      invoiceId,
+    ]);
+  }
+
+  if (patch.status !== undefined) {
+    await database.runAsync("UPDATE invoices SET status = ? WHERE id = ?", [
+      patch.status,
+      invoiceId,
+    ]);
+  }
+
+  const extracted = patch.extracted;
+
+  await database.runAsync(
+    `UPDATE invoice_data SET
+      vendor_name = ?,
+      vendor_address = ?,
+      invoice_number = ?,
+      invoice_date = ?,
+      due_date = ?,
+      subtotal = ?,
+      tax_amount = ?,
+      discount_amount = ?,
+      total_amount = ?,
+      currency = ?,
+      payment_method = ?,
+      notes = ?
+    WHERE invoice_id = ?`,
+    [
+      extracted.vendor_name,
+      extracted.vendor_address,
+      extracted.invoice_number,
+      extracted.invoice_date,
+      extracted.due_date,
+      extracted.subtotal,
+      extracted.tax_amount,
+      extracted.discount_amount,
+      extracted.total_amount,
+      extracted.currency,
+      extracted.payment_method,
+      extracted.notes,
+      invoiceId,
+    ],
+  );
 }
 
 export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
