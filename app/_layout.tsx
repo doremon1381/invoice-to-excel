@@ -10,6 +10,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import { I18nextProvider, useTranslation } from "react-i18next";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { I18nHydrate } from "@/hooks/locale/I18nHydrate";
@@ -92,11 +93,13 @@ export default function RootLayout() {
   const [isI18nReady, setIsI18nReady] = useState(false);
 
   return (
-    <AppThemeProvider>
-      <I18nextProvider i18n={i18n}>
-        <I18nHydrate onReady={() => setIsI18nReady(true)} />
-        <AppBootstrap i18nReady={isI18nReady} />
-      </I18nextProvider>
-    </AppThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppThemeProvider>
+        <I18nextProvider i18n={i18n}>
+          <I18nHydrate onReady={() => setIsI18nReady(true)} />
+          <AppBootstrap i18nReady={isI18nReady} />
+        </I18nextProvider>
+      </AppThemeProvider>
+    </GestureHandlerRootView>
   );
 }
