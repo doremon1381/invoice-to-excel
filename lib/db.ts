@@ -13,9 +13,84 @@ import type {
 
 import { Platform } from "react-native";
 
-// Only use SQLite on native, not web
-const database =
-  Platform.OS !== "web" ? SQLite.openDatabaseSync("invoices.db") : null;
+let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let initializedPromise: Promise<void> | null = null;
+
+async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
+  if (!databasePromise) {
+    databasePromise = SQLite.openDatabaseAsync("invoices.db").catch((error) => {
+      databasePromise = null;
+      throw error;
+    });
+  }
+
+  return databasePromise;
+}
+
+async function runSchemaMigrations(
+  database: SQLite.SQLiteDatabase,
+): Promise<void> {
+  await database.execAsync(`
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      image_uri TEXT NOT NULL,
+      raw_text TEXT,
+      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      status TEXT DEFAULT 'pending'
+    );
+
+    CREATE TABLE IF NOT EXISTS invoice_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      vendor_name TEXT,
+      vendor_address TEXT,
+      invoice_number TEXT,
+      invoice_date TEXT,
+      due_date TEXT,
+      subtotal REAL,
+      tax_amount REAL,
+      discount_amount REAL,
+      total_amount REAL,
+      currency TEXT DEFAULT 'VND',
+      payment_method TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS line_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+      description TEXT,
+      quantity REAL,
+      unit_price REAL,
+      unit TEXT,
+      total_price REAL
+    );
+  `);
+}
+
+async function getReadyDatabase(): Promise<SQLite.SQLiteDatabase | null> {
+  const database = await getDatabase();
+
+  if (!database) {
+    return null;
+  }
+
+  if (!initializedPromise) {
+    initializedPromise = runSchemaMigrations(database).catch((error) => {
+      initializedPromise = null;
+      throw error;
+    });
+  }
+
+  await initializedPromise;
+  return database;
+}
 
 function mapInvoiceListItem(
   row: Record<string, SQLite.SQLiteBindValue>,
@@ -67,50 +142,17 @@ function mapLineItem(row: Record<string, SQLite.SQLiteBindValue>): LineItem {
 }
 
 export async function initializeDatabase(): Promise<void> {
-  await database?.execAsync(`
-    PRAGMA foreign_keys = ON;
-
-    CREATE TABLE IF NOT EXISTS invoices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      image_uri TEXT NOT NULL,
-      raw_text TEXT,
-      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      status TEXT DEFAULT 'pending'
-    );
-
-    CREATE TABLE IF NOT EXISTS invoice_data (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-      vendor_name TEXT,
-      vendor_address TEXT,
-      invoice_number TEXT,
-      invoice_date TEXT,
-      due_date TEXT,
-      subtotal REAL,
-      tax_amount REAL,
-      discount_amount REAL,
-      total_amount REAL,
-      currency TEXT DEFAULT 'VND',
-      payment_method TEXT,
-      notes TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS line_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-      description TEXT,
-      quantity REAL,
-      unit_price REAL,
-      unit TEXT,
-      total_price REAL
-    );
-  `);
+  await getReadyDatabase();
 }
 
 export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
-  await initializeDatabase();
+  const database = await getReadyDatabase();
 
-  const createdInvoice = await database?.runAsync(
+  if (!database) {
+    throw new Error("SQLite is not available on this platform.");
+  }
+
+  const createdInvoice = await database.runAsync(
     "INSERT INTO invoices (image_uri, raw_text, status) VALUES (?, ?, ?)",
     [input.imageUri, input.rawText, input.status],
   );
@@ -118,7 +160,7 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   const invoiceId = Number(createdInvoice?.lastInsertRowId);
   const extracted = input.extracted;
 
-  await database?.runAsync(
+  await database.runAsync(
     `INSERT INTO invoice_data (
       invoice_id,
       vendor_name,
@@ -152,7 +194,7 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   );
 
   for (const item of extracted.line_items) {
-    await database?.runAsync(
+    await database.runAsync(
       "INSERT INTO line_items (invoice_id, description, quantity, unit_price, unit, total_price) VALUES (?, ?, ?, ?, ?, ?)",
       [
         invoiceId,
@@ -176,9 +218,9 @@ export async function updateInvoice(
     status?: InvoiceStatus;
   },
 ): Promise<void> {
-  await initializeDatabase();
+  const database = await getReadyDatabase();
 
-  if (Platform.OS === "web" || !database) {
+  if (!database) {
     return;
   }
 
@@ -232,9 +274,13 @@ export async function updateInvoice(
 }
 
 export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
-  await initializeDatabase();
+  const database = await getReadyDatabase();
 
-  const rows = await database?.getAllAsync<
+  if (!database) {
+    return [];
+  }
+
+  const rows = await database.getAllAsync<
     Record<string, SQLite.SQLiteBindValue>
   >(`
     SELECT
@@ -259,9 +305,13 @@ export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
 export async function getInvoiceById(
   invoiceId: number,
 ): Promise<InvoiceDetail> {
-  await initializeDatabase();
+  const database = await getReadyDatabase();
 
-  const row = await database?.getFirstAsync<
+  if (!database) {
+    throw new Error("SQLite is not available on this platform.");
+  }
+
+  const row = await database.getFirstAsync<
     Record<string, SQLite.SQLiteBindValue>
   >(
     `SELECT
@@ -338,9 +388,13 @@ export async function getInvoiceById(
 }
 
 export async function getLineItems(invoiceId: number): Promise<LineItem[]> {
-  await initializeDatabase();
+  const database = await getReadyDatabase();
 
-  const rows = await database?.getAllAsync<
+  if (!database) {
+    return [];
+  }
+
+  const rows = await database.getAllAsync<
     Record<string, SQLite.SQLiteBindValue>
   >(
     "SELECT id, invoice_id, description, quantity, unit_price, unit, total_price FROM line_items WHERE invoice_id = ? ORDER BY id ASC",
@@ -351,13 +405,23 @@ export async function getLineItems(invoiceId: number): Promise<LineItem[]> {
 }
 
 export async function deleteInvoice(invoiceId: number): Promise<void> {
-  await initializeDatabase();
-  await database?.runAsync("DELETE FROM invoices WHERE id = ?", [invoiceId]);
+  const database = await getReadyDatabase();
+
+  if (!database) {
+    return;
+  }
+
+  await database.runAsync("DELETE FROM invoices WHERE id = ?", [invoiceId]);
 }
 
 export async function getInvoiceCount(): Promise<number> {
-  await initializeDatabase();
-  const result = await database?.getFirstAsync<{ count: number }>(
+  const database = await getReadyDatabase();
+
+  if (!database) {
+    return 0;
+  }
+
+  const result = await database.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM invoices",
   );
   return result?.count ?? 0;
