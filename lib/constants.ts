@@ -8,7 +8,7 @@ export const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_secure_v1";
 
 export const OPENAI_BASE_URL =
   "https://platform.beeknoee.com/api/v1/chat/completions";
-export const OPENAI_API_KEY = "sk-bee-971d8086b0514d8dbaa7039457e64462";
+export const OPENAI_API_KEY = "";
 export const OPENAI_MODEL = "gemini-3-flash";
 export const OPENAI_EFFORT_LEVEL_MAX = "max";
 export const OPENAI_EFFORT_LEVEL_HIGH = "high";
