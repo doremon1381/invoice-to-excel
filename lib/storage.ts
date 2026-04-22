@@ -6,10 +6,12 @@ import type { ExportHistoryEntry } from "@/lib/types";
 
 const KEYS = {
   THEME_MODE: "theme_mode",
+  APP_LOCALE: "app_locale",
   EXPORT_HISTORY: EXPORT_HISTORY_STORAGE_KEY,
 } as const;
 
 export type ThemeMode = "light" | "dark";
+export type AppLocale = "en" | "vi";
 
 function canUseWebStorage(): boolean {
   return Platform.OS === "web" && typeof window !== "undefined";
@@ -45,6 +47,20 @@ export const Storage = {
 
   async setThemeMode(mode: ThemeMode): Promise<void> {
     await setItem(KEYS.THEME_MODE, mode);
+  },
+
+  async getAppLocale(): Promise<AppLocale | null> {
+    const value = await getItem(KEYS.APP_LOCALE);
+
+    if (value === "en" || value === "vi") {
+      return value;
+    }
+
+    return null;
+  },
+
+  async setAppLocale(locale: AppLocale): Promise<void> {
+    await setItem(KEYS.APP_LOCALE, locale);
   },
 
   async getExportHistory(): Promise<ExportHistoryEntry[]> {

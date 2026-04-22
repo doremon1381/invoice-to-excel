@@ -1,6 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { ThemedText } from "@/components/shared/themed-text";
 import { Button } from "@/components/shared/ui/Button";
@@ -13,17 +14,19 @@ import { SectionTitle } from "@/components/shared/ui/SectionTitle";
 import { Colors } from "@/constants/theme";
 import { useInvoiceExport } from "@/hooks/invoice/useInvoiceExport";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
-import { getInvoiceCount } from "@/lib/db";
+import { deleteNonFinalInvoices, getInvoiceCount } from "@/lib/db";
 import { Storage } from "@/lib/storage";
 import type { ExportHistoryEntry } from "@/lib/types";
 
 export default function DatabaseManagementScreen() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { exportAll, isExporting } = useInvoiceExport();
   const [recordCount, setRecordCount] = useState(0);
   const [history, setHistory] = useState<ExportHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPurging, setIsPurging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -40,12 +43,12 @@ export default function DatabaseManagementScreen() {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to load database metrics.",
+          : t("database.loadError"),
       );
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,18 +68,53 @@ export default function DatabaseManagementScreen() {
       await loadData();
     } catch (caughtError) {
       Alert.alert(
-        "Export failed",
+        t("database.alertExportFailed"),
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to export invoices.",
+          : t("database.alertExportFailedMessage"),
       );
     }
+  }
+
+  function handlePurgeNonFinalInvoices() {
+    Alert.alert(t("database.alertPurgeTitle"), t("database.alertPurgeMessage"), [
+      {
+        text: t("common.cancel"),
+        style: "cancel",
+      },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            setIsPurging(true);
+            try {
+              const deletedCount = await deleteNonFinalInvoices();
+              await loadData();
+              Alert.alert(
+                t("database.alertCleanupComplete"),
+                t("database.alertCleanupCompleteMessage", { count: deletedCount }),
+              );
+            } catch (caughtError) {
+              Alert.alert(
+                t("database.alertCleanupFailed"),
+                caughtError instanceof Error
+                  ? caughtError.message
+                  : t("database.alertCleanupFailedMessage"),
+              );
+            } finally {
+              setIsPurging(false);
+            }
+          })();
+        },
+      },
+    ]);
   }
 
   if (isLoading) {
     return (
       <ScreenContainer padded={false}>
-        <LoadingState message="Loading database metrics..." />
+        <LoadingState message={t("database.loadingMetrics")} />
       </ScreenContainer>
     );
   }
@@ -92,8 +130,8 @@ export default function DatabaseManagementScreen() {
   return (
     <ScreenContainer scroll>
       <SectionTitle
-        title="Database management"
-        description="Review local storage metrics, export history, and Excel output activity."
+        title={t("database.title")}
+        description={t("database.subtitle")}
       />
 
       <Card className="mt-5 rounded-[28px] border p-5">
@@ -103,18 +141,19 @@ export default function DatabaseManagementScreen() {
             style={{ borderColor: colors.border }}
           >
             <ThemedText
-              style={{ color: colors.muted, fontSize: 13, fontWeight: "600" }}
+              className="text-caption font-semibold"
+              style={{ color: colors.muted }}
             >
-              Total Records
+              {t("database.totalRecords")}
             </ThemedText>
             <ThemedText
-              type="title"
-              style={{ fontSize: 28, lineHeight: 30, marginTop: 8 }}
+              type="custom"
+              className="mt-2 text-display font-bold"
             >
               {recordCount}
             </ThemedText>
-            <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
-              Invoices stored locally
+            <ThemedText className="text-xs" style={{ color: colors.muted }}>
+              {t("database.invoicesStoredLocally")}
             </ThemedText>
           </View>
           <View
@@ -122,49 +161,60 @@ export default function DatabaseManagementScreen() {
             style={{ borderColor: colors.border }}
           >
             <ThemedText
-              style={{ color: colors.muted, fontSize: 13, fontWeight: "600" }}
+              className="text-caption font-semibold"
+              style={{ color: colors.muted }}
             >
-              Storage Size
+              {t("database.storageSize")}
             </ThemedText>
             <ThemedText
-              type="title"
-              style={{ fontSize: 28, lineHeight: 30, marginTop: 8 }}
+              type="custom"
+              className="mt-2 text-display font-bold"
             >
               {storageSize}
             </ThemedText>
-            <ThemedText style={{ color: colors.muted, fontSize: 12 }}>
-              Estimated local usage
+            <ThemedText className="text-xs" style={{ color: colors.muted }}>
+              {t("database.estimatedLocalUsage")}
             </ThemedText>
           </View>
         </View>
       </Card>
 
       <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">History</ThemedText>
+        <ThemedText type="defaultSemiBold">{t("database.history")}</ThemedText>
         <View className="mt-4 gap-3">
           <View className="flex-row px-1">
-            <ThemedText style={{ color: colors.muted, flex: 1, fontSize: 12 }}>
-              Date
-            </ThemedText>
-            <ThemedText style={{ color: colors.muted, width: 56, fontSize: 12 }}>
-              Type
-            </ThemedText>
-            <ThemedText style={{ color: colors.muted, width: 64, fontSize: 12 }}>
-              Records
+            <ThemedText
+              className="text-xs"
+              style={{ color: colors.muted, flex: 1 }}
+            >
+              {t("database.colDate")}
             </ThemedText>
             <ThemedText
+              className="text-xs"
+              style={{ color: colors.muted, width: 56 }}
+            >
+              {t("database.colType")}
+            </ThemedText>
+            <ThemedText
+              className="text-xs"
+              style={{ color: colors.muted, width: 64 }}
+            >
+              {t("database.colRecords")}
+            </ThemedText>
+            <ThemedText
+              className="text-xs text-right"
               style={{
                 color: colors.muted,
                 width: 54,
-                fontSize: 12,
-                textAlign: "right",
               }}
             >
-              Status
+              {t("database.colStatus")}
             </ThemedText>
           </View>
           {history.length === 0 ? (
-            <ThemedText style={{ color: colors.muted }}>No exports yet.</ThemedText>
+            <ThemedText style={{ color: colors.muted }}>
+              {t("database.noExportsYet")}
+            </ThemedText>
           ) : (
             history.slice(0, 4).map((entry, index) => (
               <View
@@ -176,13 +226,13 @@ export default function DatabaseManagementScreen() {
                     index === Math.min(history.length, 4) - 1 ? 0 : 1,
                 }}
               >
-                <ThemedText style={{ flex: 1, fontSize: 13 }}>
+                <ThemedText className="text-caption" style={{ flex: 1 }}>
                   {entry.created_at.slice(0, 10)}
                 </ThemedText>
-                <ThemedText style={{ width: 56, fontSize: 13 }}>
+                <ThemedText className="text-caption" style={{ width: 56 }}>
                   {entry.file_type}
                 </ThemedText>
-                <ThemedText style={{ width: 64, fontSize: 13 }}>
+                <ThemedText className="text-caption" style={{ width: 64 }}>
                   {entry.record_count}
                 </ThemedText>
                 <View className="w-[54px] items-end">
@@ -203,11 +253,11 @@ export default function DatabaseManagementScreen() {
       </Card>
 
       <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">Recent Exports</ThemedText>
+        <ThemedText type="defaultSemiBold">{t("database.recentExports")}</ThemedText>
         <View className="mt-4 gap-3">
           {recentExports.length === 0 ? (
             <ThemedText style={{ color: colors.muted }}>
-              Export activity will appear here after your first Excel export.
+              {t("database.recentExportsEmpty")}
             </ThemedText>
           ) : (
             recentExports.map((entry) => (
@@ -223,9 +273,12 @@ export default function DatabaseManagementScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <ThemedText type="defaultSemiBold">Excel Export</ThemedText>
-                  <ThemedText style={{ color: colors.muted, fontSize: 13 }}>
-                    {entry.record_count} records ·{" "}
+                  <ThemedText type="defaultSemiBold">
+                    {t("database.excelExport")}
+                  </ThemedText>
+                  <ThemedText className="text-caption" style={{ color: colors.muted }}>
+                    {entry.record_count} {t("common.records")}{" "}
+                    {t("common.separatorMiddleDot")}{" "}
                     {entry.created_at.slice(0, 16).replace("T", " ")}
                   </ThemedText>
                 </View>
@@ -236,9 +289,23 @@ export default function DatabaseManagementScreen() {
 
         <Button
           className="mt-6"
-          disabled={isExporting || recordCount === 0}
-          label={isExporting ? "EXPORTING" : "EXPORT TO EXCEL"}
+          disabled={isExporting || isPurging || recordCount === 0}
+          label={
+            isExporting ? t("database.exporting") : t("database.exportToExcel")
+          }
           onPress={() => void handleExport()}
+        />
+        <ThemedText className="mt-4 text-xs" style={{ color: colors.muted }}>
+          {t("database.purgeHint")}
+        </ThemedText>
+        <Button
+          className="mt-3"
+          disabled={isPurging || isExporting || recordCount === 0}
+          label={
+            isPurging ? t("database.cleaning") : t("database.cleanNonFinal")
+          }
+          onPress={handlePurgeNonFinalInvoices}
+          variant="destructive"
         />
       </Card>
     </ScreenContainer>

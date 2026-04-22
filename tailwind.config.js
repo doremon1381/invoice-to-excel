@@ -1,9 +1,29 @@
 /** @type {import('tailwindcss').Config} */
+const typographyTokens = require('./constants/typography.tokens.json');
+
+/** @param {{ size: number; lineHeight: number }} t */
+function fontSizeTuple(t) {
+  return [`${t.size}px`, { lineHeight: `${t.lineHeight}px` }];
+}
+
 module.exports = {
   content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
+      fontSize: {
+        '2xs': fontSizeTuple(typographyTokens['2xs']),
+        tiny: fontSizeTuple(typographyTokens.tiny),
+        xs: fontSizeTuple(typographyTokens.xs),
+        caption: fontSizeTuple(typographyTokens.caption),
+        sm: fontSizeTuple(typographyTokens.sm),
+        md: fontSizeTuple(typographyTokens.md),
+        base: fontSizeTuple(typographyTokens.base),
+        lead: fontSizeTuple(typographyTokens.lead),
+        xl: fontSizeTuple(typographyTokens.xl),
+        display: fontSizeTuple(typographyTokens.display),
+        'display-lg': fontSizeTuple(typographyTokens.displayLg),
+      },
       colors: {
         light: {
           background: '#fff',

@@ -5,19 +5,23 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { CameraViewfinder } from "@/components/scan/CameraViewfinder";
-import { ExtractionSummaryCard } from "@/components/scan/ExtractionSummaryCard";
 import { LoadingOverlay } from "@/components/scan/LoadingOverlay";
 import { ScanControls } from "@/components/scan/ScanControls";
 import { ScanHeader } from "@/components/scan/ScanHeader";
 import { ErrorState } from "@/components/shared/ui/ErrorState";
 import { Colors } from "@/constants/theme";
-import { useInvoiceScan } from "@/hooks/scan/useInvoiceScan";
+import { clearPendingScan, setPendingScan } from "@/lib/pendingScan";
+import { useInvoiceScan, type ScanResult } from "@/hooks/scan/useInvoiceScan";
+import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
 export default function ScanScreen() {
   const router = useRouter();
-  const colors = Colors.dark;
+  const { t } = useTranslation();
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
   const cameraRef = useRef<InstanceType<typeof CameraView> | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -55,15 +59,23 @@ export default function ScanScreen() {
   );
 
   async function handleScanAction(
-    action: () => Promise<{ invoiceId: number; imageUri: string } | null>,
+    action: () => Promise<ScanResult | null>,
     errorTitle: string,
     fallbackMessage: string,
   ) {
     try {
       const result = await action();
       if (result) {
+        setPendingScan({
+          extracted: result.extracted,
+          imageBase64: result.imageBase64,
+          imageMime: result.imageMime,
+          imageUri: result.imageUri,
+          rawText: result.rawText,
+          status: result.status,
+        });
         clearScanPreview();
-        router.push(`/invoice/${result.invoiceId}`);
+        router.push("/invoice/new");
       }
     } catch (caughtError) {
       const message =
@@ -75,8 +87,8 @@ export default function ScanScreen() {
   async function handlePickImage() {
     await handleScanAction(
       pickFromLibrary,
-      "Import failed",
-      "Unable to import invoice.",
+      t("scan.importFailed"),
+      t("scan.importFailedMessage"),
     );
   }
 
@@ -94,8 +106,8 @@ export default function ScanScreen() {
 
     await handleScanAction(
       () => captureFromCamera(cameraRef),
-      "Scan failed",
-      "Unable to scan invoice.",
+      t("scan.scanFailed"),
+      t("scan.scanFailedMessage"),
     );
   }
 
@@ -105,10 +117,10 @@ export default function ScanScreen() {
     needsCamera && permission !== null && !permission.granted,
   );
   const headerTitle = isLoading
-    ? "TRANSLATING…"
+    ? t("scan.headerTranslating")
     : previewData && !error
-      ? "DONE"
-      : "READY TO SCAN";
+      ? t("scan.headerDone")
+      : t("scan.headerReady");
 
   return (
     <SafeAreaView
@@ -116,13 +128,13 @@ export default function ScanScreen() {
       edges={["top"]}
       style={{ backgroundColor: colors.background }}
     >
-      <StatusBar style="light" />
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <View className="flex-1 px-4">
         <ScanHeader
           colors={colors}
           title={headerTitle}
           onClose={() => router.back()}
-          onOpenSettings={() => router.push("/settings")}
+          onOpenSettings={() => router.push("/(tabs)/settings")}
         />
 
         <View className="mt-4 flex-1 items-center justify-center">
@@ -135,13 +147,15 @@ export default function ScanScreen() {
               <ErrorState
                 message={
                   permission.canAskAgain
-                    ? "Camera access is required to scan invoices."
-                    : "Camera access is turned off for this app. Enable it in system settings, then try again."
+                    ? t("scan.cameraRequired")
+                    : t("scan.cameraDisabled")
                 }
                 retryLabel={
-                  permission.canAskAgain ? "Allow camera" : "Open settings"
+                  permission.canAskAgain
+                    ? t("scan.allowCamera")
+                    : t("scan.openSettings")
                 }
-                variant="dark"
+                variant="default"
                 onRetry={() =>
                   void (permission.canAskAgain
                     ? requestPermission()
@@ -160,13 +174,14 @@ export default function ScanScreen() {
                 staticImageUri={previewUri}
                 onCameraReady={() => setIsCameraReady(true)}
               />
-              <ExtractionSummaryCard
+              {/* TODO: Add extraction summary card */}
+              {/* <ExtractionSummaryCard
                 colors={colors}
                 error={error}
                 isLoading={isLoading}
                 previewData={previewData}
                 previewUri={previewUri}
-              />
+              /> */}
             </>
           )}
         </View>
@@ -175,8 +190,8 @@ export default function ScanScreen() {
           <View className="mb-3">
             <ErrorState
               message={error}
-              retryLabel="Dismiss"
-              variant="dark"
+              retryLabel={t("scan.dismiss")}
+              variant="default"
               onRetry={() => setError(null)}
             />
           </View>
@@ -188,13 +203,14 @@ export default function ScanScreen() {
           onCapture={() => void handleCapture()}
           onImport={() => void handlePickImage()}
           onRescan={() => {
+            clearPendingScan();
             clearScanPreview();
           }}
         />
       </View>
 
       {isLoading ? (
-        <LoadingOverlay message="Translating invoice…" variant="dark" />
+        <LoadingOverlay message={t("scan.translatingOverlay")} variant="default" />
       ) : null}
     </SafeAreaView>
   );

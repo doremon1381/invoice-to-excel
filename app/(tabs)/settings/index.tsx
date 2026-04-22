@@ -1,31 +1,45 @@
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/shared/themed-text";
-import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
 import { SectionTitle } from "@/components/shared/ui/SectionTitle";
 import { Colors } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/theme/theme-provider";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
-import { OPENAI_BASE_URL, OPENAI_MODEL } from "@/lib/constants";
+import { i18n } from "@/lib/i18n";
+import { Storage, type AppLocale } from "@/lib/storage";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { colorScheme: themeMode, setThemeMode } = useAppTheme();
+  const activeLocale: AppLocale = i18n.resolvedLanguage
+    ?.toLowerCase()
+    .startsWith("vi")
+    ? "vi"
+    : "en";
+
+  async function setLocale(locale: AppLocale) {
+    await i18n.changeLanguage(locale);
+    await Storage.setAppLocale(locale);
+  }
 
   return (
     <ScreenContainer scroll className="mb-5">
       <SectionTitle
-        title="Settings"
-        description="Configure appearance and database tools for the invoice workspace. Scanning uses the AI extraction API only."
+        title={t("settings.title")}
+        description={t("settings.subtitle")}
       />
 
       <Card className="mt-4 rounded-[28px] border py-5 px-4">
-        <ThemedText type="defaultSemiBold">Appearance</ThemedText>
+        <ThemedText type="defaultSemiBold">
+          {t("settings.appearance")}
+        </ThemedText>
         <View
           className="mt-4 flex-row rounded-full border p-1"
           style={{
@@ -53,7 +67,9 @@ export default function SettingsScreen() {
                     textTransform: "capitalize",
                   }}
                 >
-                  {mode} mode
+                  {mode === "light"
+                    ? t("settings.lightMode")
+                    : t("settings.darkMode")}
                 </ThemedText>
               </Pressable>
             );
@@ -61,32 +77,72 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">AI extraction</ThemedText>
-        <ThemedText className="mt-2" style={{ color: colors.muted }}>
-          Invoice scans are sent to the OpenAI-compatible chat completions API
-          configured in the app. Endpoint{" "}
-          <ThemedText style={{ color: colors.foreground }}>
-            {OPENAI_BASE_URL}
-          </ThemedText>
-          , model{" "}
-          <ThemedText style={{ color: colors.foreground }}>
-            {OPENAI_MODEL}
-          </ThemedText>
-          . No separate OCR server is used.
-        </ThemedText>
+      <Card className="mt-4 rounded-[28px] border py-5 px-4">
+        <ThemedText type="defaultSemiBold">{t("settings.language")}</ThemedText>
+        <View
+          className="mt-4 flex-row rounded-full border p-1"
+          style={{
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+          }}
+        >
+          {(["en", "vi"] as const).map((locale) => {
+            const isActive = activeLocale === locale;
+
+            return (
+              <Pressable
+                key={locale}
+                className="flex-1 rounded-full px-4 py-3"
+                onPress={() => void setLocale(locale)}
+                style={{
+                  backgroundColor: isActive ? colors.accent : "transparent",
+                }}
+              >
+                <ThemedText
+                  style={{
+                    color: isActive ? colors.background : colors.muted,
+                    fontWeight: "700",
+                    textAlign: "center",
+                  }}
+                >
+                  {locale === "en"
+                    ? t("settings.english")
+                    : t("settings.vietnamese")}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
       </Card>
 
-      <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">Database</ThemedText>
+      {/* TODO: Add AI extraction card later */}
+      {/* <Card className="mt-5 rounded-[28px] border p-5">
+        <ThemedText type="defaultSemiBold">{t("settings.aiExtraction")}</ThemedText>
         <ThemedText className="mt-2" style={{ color: colors.muted }}>
-          Review storage, export history, and Excel tools.
+          {t("settings.aiExtractionBody", {
+            endpoint: OPENAI_BASE_URL,
+            model: OPENAI_MODEL,
+          })}
         </ThemedText>
-        <Button
-          className="mt-4"
-          label="OPEN DATABASE MANAGEMENT"
+      </Card> */}
+
+      <Card className="mt-5 rounded-[28px] border p-5">
+        <ThemedText type="defaultSemiBold">{t("settings.database")}</ThemedText>
+        <ThemedText className="mt-2" style={{ color: colors.muted }}>
+          {t("settings.databaseDescription")}
+        </ThemedText>
+        <Pressable
+          className="mt-4 min-h-[52px] items-center justify-center rounded-2xl px-4 py-4"
+          style={({ pressed }) => ({
+            backgroundColor: colors.accent,
+            opacity: pressed ? 0.85 : 1,
+          })}
           onPress={() => router.push("/(tabs)/settings/database-management")}
-        />
+        >
+          <ThemedText style={{ color: colors.foreground }}>
+            {t("settings.openDatabaseManagement")}
+          </ThemedText>
+        </Pressable>
       </Card>
     </ScreenContainer>
   );

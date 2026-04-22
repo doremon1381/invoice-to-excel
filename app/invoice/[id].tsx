@@ -1,5 +1,11 @@
-import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Image,
@@ -9,39 +15,55 @@ import {
   ScrollView,
   UIManager,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FinancialSummary } from '@/components/invoice/FinancialSummary';
-import { LoadingOverlay } from '@/components/scan/LoadingOverlay';
-import { ThemedText } from '@/components/shared/themed-text';
-import { ThemedView } from '@/components/shared/themed-view';
-import { Button } from '@/components/shared/ui/Button';
-import { Card } from '@/components/shared/ui/Card';
-import { FieldInput } from '@/components/shared/ui/FieldInput';
-import { IconSymbol } from '@/components/shared/ui/icon-symbol';
-import { NumberBadge } from '@/components/shared/ui/NumberBadge';
-import { ScreenContainer } from '@/components/shared/ui/ScreenContainer';
-import { Colors } from '@/constants/theme';
-import { useInvoiceExport } from '@/hooks/invoice/useInvoiceExport';
-import { useColorScheme } from '@/hooks/theme/use-color-scheme';
-import { deleteInvoice, getInvoiceById, updateInvoice } from '@/lib/db';
-import type { ExtractedInvoice, InvoiceDetail, InvoiceStatus, LineItem } from '@/lib/types';
+import { FinancialSummary } from "@/components/invoice/FinancialSummary";
+import { LoadingOverlay } from "@/components/scan/LoadingOverlay";
+import { ThemedText } from "@/components/shared/themed-text";
+import { ThemedView } from "@/components/shared/themed-view";
+import { Button } from "@/components/shared/ui/Button";
+import { Card } from "@/components/shared/ui/Card";
+import { FieldInput } from "@/components/shared/ui/FieldInput";
+import { IconSymbol } from "@/components/shared/ui/icon-symbol";
+import { NumberBadge } from "@/components/shared/ui/NumberBadge";
+import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
+import { Colors } from "@/constants/theme";
+import { useInvoiceExport } from "@/hooks/invoice/useInvoiceExport";
+import { useColorScheme } from "@/hooks/theme/use-color-scheme";
+import { deleteInvoice, getInvoiceById, saveInvoice, updateInvoice } from "@/lib/db";
+import {
+  clearPendingScan,
+  getPendingScan,
+  type PendingScanPayload,
+} from "@/lib/pendingScan";
+import type {
+  ExtractedInvoice,
+  InvoiceDetail,
+  InvoiceStatus,
+  LineItem,
+} from "@/lib/types";
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 function getDisplayValue(value: string | null): string {
-  return value ?? '—';
+  return value ?? "—";
 }
 
-function getStatusColor(status: InvoiceDetail['status'], colors: (typeof Colors)[keyof typeof Colors]): string {
-  if (status === 'success') {
+function getStatusColor(
+  status: InvoiceDetail["status"],
+  colors: (typeof Colors)[keyof typeof Colors],
+): string {
+  if (status === "success") {
     return colors.success;
   }
 
-  if (status === 'error') {
+  if (status === "error") {
     return colors.danger;
   }
 
@@ -57,7 +79,7 @@ function getLineItemAmount(item: LineItem): string {
     return String(item.unit_price);
   }
 
-  return '—';
+  return "—";
 }
 
 function deriveEditableStatus(fields: {
@@ -70,19 +92,40 @@ function deriveEditableStatus(fields: {
     fields.vendor_name,
     fields.invoice_number,
     fields.invoice_date,
-    fields.total_amount !== null && fields.total_amount !== undefined ? String(fields.total_amount) : null,
+    fields.total_amount !== null && fields.total_amount !== undefined
+      ? String(fields.total_amount)
+      : null,
   ].filter(Boolean).length;
 
-  return score >= 2 ? 'success' : 'pending';
+  return score >= 2 ? "success" : "pending";
+}
+
+function isInvoiceEditable(status: InvoiceStatus): boolean {
+  return status !== "success" && status !== "error";
+}
+
+function buildPreviewInvoice(payload: PendingScanPayload): InvoiceDetail {
+  return {
+    id: 0,
+    image_uri: payload.imageUri,
+    image_base64: payload.imageBase64,
+    image_mime: payload.imageMime,
+    raw_text: payload.rawText,
+    scanned_at: new Date().toISOString(),
+    status: payload.status,
+    ...payload.extracted,
+  };
 }
 
 export default function InvoiceDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const isPreviewMode = id === "new";
   const invoiceId = Number(id);
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { exportSingle, isExporting } = useInvoiceExport();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
@@ -90,12 +133,13 @@ export default function InvoiceDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [headerImageUri, setHeaderImageUri] = useState<string | null>(null);
 
-  const [vendorName, setVendorName] = useState('');
-  const [vendorAddress, setVendorAddress] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState('');
-  const [totalAmountStr, setTotalAmountStr] = useState('');
-  const [taxAmountStr, setTaxAmountStr] = useState('');
+  const [vendorName, setVendorName] = useState("");
+  const [vendorAddress, setVendorAddress] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [totalAmountStr, setTotalAmountStr] = useState("");
+  const [taxAmountStr, setTaxAmountStr] = useState("");
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -106,14 +150,29 @@ export default function InvoiceDetailScreen() {
     setError(null);
 
     try {
+      if (isPreviewMode) {
+        const pendingScan = getPendingScan();
+        if (!pendingScan) {
+          setInvoice(null);
+          setError("No pending scan data. Please scan again.");
+          return;
+        }
+        setInvoice(buildPreviewInvoice(pendingScan));
+        return;
+      }
+
       const nextInvoice = await getInvoiceById(invoiceId);
       setInvoice(nextInvoice);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Unable to load invoice.');
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("invoice.loadError"),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [invoiceId]);
+  }, [invoiceId, isPreviewMode, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -122,49 +181,85 @@ export default function InvoiceDetailScreen() {
   );
 
   useEffect(() => {
-    if (!invoice) {
+    if (!isPreviewMode) {
       return;
     }
 
-    setVendorName(invoice.vendor_name ?? '');
-    setVendorAddress(invoice.vendor_address ?? '');
-    setInvoiceDate(invoice.invoice_date ?? '');
+    return () => {
+      clearPendingScan();
+    };
+  }, [isPreviewMode]);
+
+  useEffect(() => {
+    if (!invoice) {
+      setHeaderImageUri(null);
+      return;
+    }
+
+    setHeaderImageUri(invoice.image_uri);
+    setVendorName(invoice.vendor_name ?? "");
+    setVendorAddress(invoice.vendor_address ?? "");
+    setInvoiceDate(invoice.invoice_date ?? "");
     setTotalAmountStr(
-      invoice.total_amount !== null && invoice.total_amount !== undefined ? String(invoice.total_amount) : '',
+      invoice.total_amount !== null && invoice.total_amount !== undefined
+        ? String(invoice.total_amount)
+        : "",
     );
     setTaxAmountStr(
-      invoice.tax_amount !== null && invoice.tax_amount !== undefined ? String(invoice.tax_amount) : '',
+      invoice.tax_amount !== null && invoice.tax_amount !== undefined
+        ? String(invoice.tax_amount)
+        : "",
     );
   }, [invoice]);
 
   const handleExport = useCallback(async () => {
+    if (isPreviewMode) {
+      return;
+    }
+
     try {
       await exportSingle(invoiceId);
     } catch (caughtError) {
-      Alert.alert('Export failed', caughtError instanceof Error ? caughtError.message : 'Unable to export invoice.');
+      Alert.alert(
+        t("invoice.alertExportFailed"),
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("invoice.alertExportFailedMessage"),
+      );
     }
-  }, [exportSingle, invoiceId]);
+  }, [exportSingle, invoiceId, isPreviewMode, t]);
 
-  async function handleDelete() {
-    Alert.alert('Delete invoice', 'Are you sure you want to delete this invoice?', [
-      { style: 'cancel', text: 'Cancel' },
-      {
-        style: 'destructive',
-        text: 'Delete',
-        onPress: async () => {
-          try {
-            await deleteInvoice(invoiceId);
-            router.replace('/');
-          } catch {
-            Alert.alert('Delete failed', 'Unable to delete the invoice.');
-          }
+  function handleDelete() {
+    Alert.alert(
+      t("invoice.alertDeleteTitle"),
+      t("invoice.alertDeleteMessage"),
+      [
+        { style: "cancel", text: t("common.cancel") },
+        {
+          style: "destructive",
+          text: t("common.delete"),
+          onPress: async () => {
+            try {
+              await deleteInvoice(invoiceId);
+              router.replace("/");
+            } catch {
+              Alert.alert(
+                t("invoice.alertDeleteFailed"),
+                t("invoice.alertDeleteFailedMessage"),
+              );
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   async function handleConfirm() {
     if (!invoice) {
+      return;
+    }
+
+    if (!isPreviewMode && !isInvoiceEditable(invoice.status)) {
       return;
     }
 
@@ -197,12 +292,27 @@ export default function InvoiceDetailScreen() {
     setIsSaving(true);
 
     try {
-      await updateInvoice(invoiceId, { extracted, status });
-      router.replace('/');
+      if (isPreviewMode) {
+        await saveInvoice({
+          imageUri: invoice.image_uri,
+          imageBase64: invoice.image_base64,
+          imageMime: invoice.image_mime,
+          rawText: invoice.raw_text ?? "",
+          status,
+          extracted,
+        });
+        clearPendingScan();
+      } else {
+        await updateInvoice(invoiceId, { extracted, status });
+      }
+
+      router.replace("/");
     } catch (caughtError) {
       Alert.alert(
-        'Save failed',
-        caughtError instanceof Error ? caughtError.message : 'Unable to save changes.',
+        t("invoice.alertSaveFailed"),
+        caughtError instanceof Error
+          ? caughtError.message
+          : t("invoice.alertSaveFailedMessage"),
       );
     } finally {
       setIsSaving(false);
@@ -210,6 +320,14 @@ export default function InvoiceDetailScreen() {
   }
 
   function bumpTotal(delta: number) {
+    if (!invoice) {
+      return;
+    }
+
+    if (!isPreviewMode && !isInvoiceEditable(invoice.status)) {
+      return;
+    }
+
     const cur = Number.parseFloat(totalAmountStr);
     const base = Number.isFinite(cur) ? cur : 0;
     setTotalAmountStr((base + delta).toFixed(2));
@@ -218,7 +336,7 @@ export default function InvoiceDetailScreen() {
   if (isLoading) {
     return (
       <ScreenContainer padded={false}>
-        <LoadingOverlay message="Loading invoice…" />
+        <LoadingOverlay message={t("invoice.loading")} />
       </ScreenContainer>
     );
   }
@@ -226,13 +344,36 @@ export default function InvoiceDetailScreen() {
   if (error || !invoice) {
     return (
       <ScreenContainer className="items-center justify-center">
-        <ThemedText>{error ?? 'Invoice not found.'}</ThemedText>
-        <Button className="mt-3" label="Retry" variant="secondary" onPress={() => void loadInvoice()} />
+        <ThemedText>{error ?? t("invoice.notFound")}</ThemedText>
+        <Button
+          className="mt-3"
+          label={isPreviewMode ? t("invoice.rescan") : t("common.retry")}
+          variant="secondary"
+          onPress={() => {
+            if (isPreviewMode) {
+              router.replace("/(tabs)/scan");
+              return;
+            }
+            void loadInvoice();
+          }}
+        />
       </ScreenContainer>
     );
   }
 
   const statusColor = getStatusColor(invoice.status, colors);
+  const statusChipLabel =
+    invoice.status === "success"
+      ? t("invoice.statusSuccess")
+      : invoice.status === "error"
+        ? t("invoice.statusError")
+        : t("invoice.statusPending");
+
+  const canEdit = isPreviewMode || isInvoiceEditable(invoice.status);
+  const fallbackImageUri = invoice.image_base64
+    ? `data:${invoice.image_mime ?? "image/jpeg"};base64,${invoice.image_base64}`
+    : null;
+  const activeHeaderImageUri = headerImageUri ?? invoice.image_uri;
 
   return (
     <ThemedView className="flex-1">
@@ -243,58 +384,88 @@ export default function InvoiceDetailScreen() {
           paddingTop: 16,
         }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <View className="flex-row items-center justify-between">
           <Pressable
-            accessibilityLabel="Go back"
+            accessibilityLabel={t("invoice.goBackA11y")}
             className="h-10 w-10 items-center justify-center rounded-full"
             onPress={() => router.back()}
-            style={({ pressed }) => ({ backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.85 : 1 })}>
-            <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
+            style={({ pressed }) => ({
+              backgroundColor: colors.surfaceAlt,
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <IconSymbol
+              name="chevron.left"
+              size={22}
+              color={colors.foreground}
+            />
           </Pressable>
 
           <View className="flex-row items-center gap-2">
-            <Button
-              disabled={isExporting}
-              label={isExporting ? 'Exporting' : 'Export'}
-              size="sm"
-              variant="secondary"
-              onPress={() => void handleExport()}
-            />
+            {isPreviewMode ? null : (
+              <Button
+                disabled={isExporting}
+                label={isExporting ? t("invoice.exporting") : t("invoice.export")}
+                size="sm"
+                variant="secondary"
+                onPress={() => void handleExport()}
+              />
+            )}
             <Image
-              source={{ uri: invoice.image_uri }}
+              source={{ uri: activeHeaderImageUri }}
               className="h-12 w-12 rounded-xl border"
               style={{ borderColor: colors.border }}
+              onError={() => {
+                if (
+                  fallbackImageUri &&
+                  activeHeaderImageUri !== fallbackImageUri
+                ) {
+                  setHeaderImageUri(fallbackImageUri);
+                }
+              }}
             />
           </View>
         </View>
 
-        <ThemedText className="mt-6" type="defaultSemiBold" style={{ letterSpacing: 0.6, textTransform: 'uppercase' }}>
-          Structured review
+        <ThemedText
+          className="mt-6"
+          type="defaultSemiBold"
+          style={{ letterSpacing: 0.6, textTransform: "uppercase" }}
+        >
+          {t("invoice.structuredReview")}
         </ThemedText>
         <ThemedText className="mt-1" style={{ color: colors.muted }}>
-          Verify AI-extracted fields before they are used for export.
+          {t("invoice.structuredReviewHint")}
         </ThemedText>
 
         <Card className="mt-6 rounded-3xl border p-5" tone="accentSoft">
           <View className="mb-4 flex-row items-center gap-3">
             <NumberBadge value={1} />
-            <ThemedText type="defaultSemiBold" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
-              Vendor details
+            <ThemedText
+              type="defaultSemiBold"
+              style={{ letterSpacing: 1, textTransform: "uppercase" }}
+            >
+              {t("invoice.vendorDetails")}
             </ThemedText>
           </View>
           <View className="gap-4">
             <FieldInput
-              label="Vendor"
+              editable={canEdit}
+              label={t("invoice.labelVendor")}
               value={vendorName}
               onChangeText={setVendorName}
-              trailing={<IconSymbol name="pencil" size={20} color={colors.muted} />}
+              trailing={
+                <IconSymbol name="pencil" size={20} color={colors.muted} />
+              }
             />
             <FieldInput
-              label="Content"
+              editable={canEdit}
+              label={t("invoice.labelContent")}
               value={vendorAddress}
               onChangeText={setVendorAddress}
-              placeholder="Address or extra vendor context"
+              placeholder={t("invoice.placeholderVendorContext")}
             />
           </View>
         </Card>
@@ -302,8 +473,11 @@ export default function InvoiceDetailScreen() {
         <Card className="mt-5 rounded-3xl border p-5" tone="accentSoft">
           <View className="mb-4 flex-row items-center gap-3">
             <NumberBadge value={2} />
-            <ThemedText type="defaultSemiBold" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
-              Transaction
+            <ThemedText
+              type="defaultSemiBold"
+              style={{ letterSpacing: 1, textTransform: "uppercase" }}
+            >
+              {t("invoice.transaction")}
             </ThemedText>
           </View>
           <View className="gap-4">
@@ -311,47 +485,74 @@ export default function InvoiceDetailScreen() {
               <View className="min-w-0 flex-1">
                 <FieldInput
                   accentBorder
-                  label="Date"
+                  editable={canEdit}
+                  label={t("invoice.labelDate")}
                   value={invoiceDate}
                   onChangeText={setInvoiceDate}
-                  trailing={<IconSymbol name="calendar" size={20} color={colors.accent} />}
+                  trailing={
+                    <IconSymbol
+                      name="calendar"
+                      size={20}
+                      color={colors.accent}
+                    />
+                  }
                 />
               </View>
               <View className="min-w-0 flex-1">
                 <FieldInput
                   accentBorder
+                  editable={canEdit}
                   keyboardType="decimal-pad"
-                  label="Total"
+                  label={t("invoice.labelTotal")}
                   value={totalAmountStr}
                   onChangeText={setTotalAmountStr}
                   trailing={
-                    <View>
-                      <Pressable
-                        accessibilityLabel="Increase total"
-                        className="py-1"
-                        onPress={() => bumpTotal(1)}
-                        hitSlop={6}>
-                        <IconSymbol name="chevron.up" size={20} color={colors.accent} />
-                      </Pressable>
-                      <Pressable
-                        accessibilityLabel="Decrease total"
-                        className="py-1"
-                        onPress={() => bumpTotal(-1)}
-                        hitSlop={6}>
-                        <IconSymbol name="chevron.down" size={20} color={colors.accent} />
-                      </Pressable>
-                    </View>
+                    canEdit ? (
+                      <View>
+                        <Pressable
+                          accessibilityLabel={t("invoice.increaseTotalA11y")}
+                          className="py-1"
+                          onPress={() => bumpTotal(1)}
+                          hitSlop={6}
+                        >
+                          <IconSymbol
+                            name="chevron.up"
+                            size={20}
+                            color={colors.accent}
+                          />
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel={t("invoice.decreaseTotalA11y")}
+                          className="py-1"
+                          onPress={() => bumpTotal(-1)}
+                          hitSlop={6}
+                        >
+                          <IconSymbol
+                            name="chevron.down"
+                            size={20}
+                            color={colors.accent}
+                          />
+                        </Pressable>
+                      </View>
+                    ) : null
                   }
                 />
               </View>
             </View>
             <FieldInput
               accentBorder
+              editable={canEdit}
               keyboardType="decimal-pad"
-              label="Tax"
+              label={t("invoice.labelTax")}
               value={taxAmountStr}
               onChangeText={setTaxAmountStr}
-              trailing={<IconSymbol name="chevron.down" size={20} color={colors.accent} />}
+              trailing={
+                <IconSymbol
+                  name="chevron.down"
+                  size={20}
+                  color={colors.accent}
+                />
+              }
             />
           </View>
         </Card>
@@ -359,24 +560,44 @@ export default function InvoiceDetailScreen() {
         <Card className="mt-5 rounded-3xl border p-5" tone="accentSoft">
           <View className="mb-4 flex-row items-center gap-3">
             <NumberBadge value={3} />
-            <ThemedText type="defaultSemiBold" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
-              Summary
+            <ThemedText
+              type="defaultSemiBold"
+              style={{ letterSpacing: 1, textTransform: "uppercase" }}
+            >
+              {t("invoice.summary")}
             </ThemedText>
           </View>
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
-              <ThemedText style={{ color: colors.muted }}>Currency</ThemedText>
+              <ThemedText style={{ color: colors.muted }}>
+                {t("invoice.currency")}
+              </ThemedText>
               <ThemedText type="defaultSemiBold">{invoice.currency}</ThemedText>
             </View>
             <View className="flex-row items-center justify-between">
-              <ThemedText style={{ color: colors.muted }}>Payment method</ThemedText>
-              <ThemedText type="defaultSemiBold">{getDisplayValue(invoice.payment_method)}</ThemedText>
+              <ThemedText style={{ color: colors.muted }}>
+                {t("invoice.paymentMethod")}
+              </ThemedText>
+              <ThemedText type="defaultSemiBold">
+                {getDisplayValue(invoice.payment_method)}
+              </ThemedText>
             </View>
             <View className="flex-row items-center justify-between gap-3">
-              <ThemedText style={{ color: colors.muted }}>Status</ThemedText>
-              <View className="rounded-full px-3 py-1" style={{ backgroundColor: statusColor }}>
-                <ThemedText style={{ color: colors.onAccent, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>
-                  {invoice.status}
+              <ThemedText style={{ color: colors.muted }}>
+                {t("invoice.status")}
+              </ThemedText>
+              <View
+                className="rounded-full px-3 py-1"
+                style={{ backgroundColor: statusColor }}
+              >
+                <ThemedText
+                  type="custom"
+                  className="text-xs font-bold capitalize"
+                  style={{
+                    color: colors.onAccent,
+                  }}
+                >
+                  {statusChipLabel}
                 </ThemedText>
               </View>
             </View>
@@ -386,36 +607,64 @@ export default function InvoiceDetailScreen() {
         <Pressable
           className="mt-6 flex-row items-center justify-between rounded-2xl border px-4 py-3"
           onPress={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            LayoutAnimation.configureNext(
+              LayoutAnimation.Presets.easeInEaseOut,
+            );
             setMoreDetailsOpen((open) => !open);
           }}
-          style={{ borderColor: colors.border, backgroundColor: colors.surfaceAlt }}>
-          <ThemedText type="defaultSemiBold">More details</ThemedText>
-          <IconSymbol name="chevron.right" size={22} color={colors.foreground} />
+          style={{
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceAlt,
+          }}
+        >
+          <ThemedText type="defaultSemiBold">
+            {t("invoice.moreDetails")}
+          </ThemedText>
+          <IconSymbol
+            name="chevron.right"
+            size={22}
+            color={colors.foreground}
+          />
         </Pressable>
 
         {moreDetailsOpen ? (
           <View className="mt-4 gap-6">
             <Card className="rounded-3xl border p-5">
-              <ThemedText type="subtitle">Extraction details</ThemedText>
-              <ThemedText className="mt-2" style={{ color: colors.muted }}>
-                {invoice.status === 'success'
-                  ? 'Structured fields came from the AI response. Review the raw model output below if you need to audit the result.'
-                  : 'Raw model output was stored, but structured extraction is still limited for this invoice.'}
+              <ThemedText type="subtitle">
+                {t("invoice.extractionDetails")}
               </ThemedText>
-              <View className="mt-4 rounded-2xl border p-4" style={{ backgroundColor: colors.background, borderColor: colors.border }}>
-                <ThemedText type="defaultSemiBold">Raw extraction text</ThemedText>
-                <ThemedText className="mt-2" style={{ color: colors.muted, fontSize: 13 }}>
-                  {invoice.raw_text?.trim() ? invoice.raw_text : 'No extraction text was stored for this invoice.'}
+              <ThemedText className="mt-2" style={{ color: colors.muted }}>
+                {invoice.status === "success"
+                  ? t("invoice.extractionSuccessHint")
+                  : t("invoice.extractionLimitedHint")}
+              </ThemedText>
+              <View
+                className="mt-4 rounded-2xl border p-4"
+                style={{
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                }}
+              >
+                <ThemedText type="defaultSemiBold">
+                  {t("invoice.rawExtractionText")}
+                </ThemedText>
+                <ThemedText
+                  type="custom"
+                  className="mt-2 text-caption"
+                  style={{ color: colors.muted }}
+                >
+                  {invoice.raw_text?.trim()
+                    ? invoice.raw_text
+                    : t("invoice.noRawText")}
                 </ThemedText>
               </View>
             </Card>
 
             <Card className="rounded-3xl border p-5">
-              <ThemedText type="subtitle">Line Items</ThemedText>
+              <ThemedText type="subtitle">{t("invoice.lineItems")}</ThemedText>
               {invoice.line_items.length === 0 ? (
                 <ThemedText className="mt-3" style={{ color: colors.muted }}>
-                  No line items extracted.
+                  {t("invoice.noLineItems")}
                 </ThemedText>
               ) : (
                 <View className="mt-4">
@@ -425,12 +674,19 @@ export default function InvoiceDetailScreen() {
                       className="flex-row justify-between gap-3 py-3"
                       style={{
                         borderBottomColor: colors.border,
-                        borderBottomWidth: index === invoice.line_items.length - 1 ? 0 : 1,
-                      }}>
+                        borderBottomWidth:
+                          index === invoice.line_items.length - 1 ? 0 : 1,
+                      }}
+                    >
                       <View style={{ flex: 1 }}>
-                        <ThemedText type="defaultSemiBold">{item.description}</ThemedText>
+                        <ThemedText type="defaultSemiBold">
+                          {item.description}
+                        </ThemedText>
                         <ThemedText style={{ color: colors.muted }}>
-                          Qty: {item.quantity ?? '—'} · Unit: {getDisplayValue(item.unit)}
+                          {t("invoice.qtyUnit", {
+                            qty: item.quantity ?? "—",
+                            unit: getDisplayValue(item.unit),
+                          })}
                         </ThemedText>
                       </View>
                       <ThemedText>{getLineItemAmount(item)}</ThemedText>
@@ -448,7 +704,13 @@ export default function InvoiceDetailScreen() {
               totalAmount={invoice.total_amount}
             />
 
-            <Button label="Delete invoice" variant="destructive" onPress={handleDelete} />
+            {isPreviewMode ? null : (
+              <Button
+                label={t("invoice.deleteInvoice")}
+                variant="destructive"
+                onPress={handleDelete}
+              />
+            )}
           </View>
         ) : null}
       </ScrollView>
@@ -459,13 +721,30 @@ export default function InvoiceDetailScreen() {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
           paddingBottom: Math.max(insets.bottom, 12),
-        }}>
-        <View className="min-w-0 flex-1">
-          <Button disabled={isSaving} label="Confirm" loading={isSaving} onPress={() => void handleConfirm()} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Button label="Rescan" variant="secondary" onPress={() => router.replace('/(tabs)/scan')} />
-        </View>
+        }}
+      >
+        {canEdit ? (
+          <>
+            <View className="min-w-0 flex-1">
+              <Button
+                disabled={isSaving}
+                label={t("invoice.confirm")}
+                loading={isSaving}
+                onPress={() => void handleConfirm()}
+              />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Button
+                label={t("invoice.rescan")}
+                variant="secondary"
+                onPress={() => {
+                  clearPendingScan();
+                  router.replace("/(tabs)/scan");
+                }}
+              />
+            </View>
+          </>
+        ) : null}
       </View>
     </ThemedView>
   );

@@ -226,22 +226,40 @@ Rules:
 
 ## 8. Typography Rules
 
-Create a small typography system and apply it consistently.
+This app uses **NativeWind / Tailwind `text-*` utilities** backed by a single pixel scale. Do not introduce raw `fontSize: <number>` in components except where the platform API cannot take classes (e.g. React Navigation `headerTitleStyle`, or `TextInput` when `className` is unreliable—use `Typography` from `@/constants/typography` there).
 
-Suggested text roles:
+### Source of truth
 
-- display
-- heading
-- body
-- caption
-- overline
+- Scale values: [`constants/typography.tokens.json`](../../constants/typography.tokens.json) (size + lineHeight per token).
+- Typed access: [`constants/typography.ts`](../../constants/typography.ts) exports `Typography` (e.g. `Typography.base.size`).
+- Tailwind names: [`tailwind.config.js`](../../tailwind.config.js) `theme.extend.fontSize` mirrors the JSON so classes like `text-caption` match the same numbers.
 
-Rules:
+### Token → class mapping
 
-1. Use shared text primitives or typography helpers where practical.
-2. Avoid ad-hoc font sizes and weights across the codebase.
-3. Prefer semantic text styles over one-off combinations.
-4. Keep readable line height and spacing for dense mobile layouts.
+| Class | Size (px) | Typical use |
+| --- | --- | --- |
+| `text-2xs` | 10 | Fine print / code snippets |
+| `text-tiny` | 11 | Compact labels |
+| `text-xs` | 12 | Badges, meta, overline-style |
+| `text-caption` | 13 | Secondary body, table cells |
+| `text-sm` | 14 | Supporting text |
+| `text-md` | 15 | Emphasized small UI |
+| `text-base` | 16 | Default body |
+| `text-lead` | 17 | Slightly larger emphasis |
+| `text-xl` | 20 | Section headings, nav titles |
+| `text-display` | 28 | Stats / hero numbers |
+| `text-display-lg` | 32 | Screen titles (`ThemedText` display/title) |
+
+### `ThemedText`
+
+Use [`components/shared/themed-text.tsx`](../../components/shared/themed-text.tsx) `type` for semantic presets (`body`, `heading`, `caption`, …). Use **`type="custom"`** whenever you set your own `text-*` size on `className` (otherwise the default preset adds `text-base` and conflicts). Same pattern for stats: `type="custom"` + `className="text-display font-bold"`.
+
+### Rules
+
+1. Prefer `className="text-<token>"` on `Text` / `ThemedText` over inline font size.
+2. Avoid new arbitrary pixel sizes; extend `typography.tokens.json` + Tailwind if a new step is truly needed.
+3. Prefer semantic `ThemedText` `type` or the table above over one-off combinations.
+4. Keep readable line height: tokens include `lineHeight`; do not strip it without reason.
 
 ## 9. Shared Primitives You Should Reuse
 

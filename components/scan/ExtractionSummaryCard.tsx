@@ -31,26 +31,26 @@ export function ExtractionSummaryCard({
         backgroundColor: `${colors.surface}F2`,
         borderColor: colors.border,
       }}>
-      <Text style={{ color: colors.foreground, fontFamily: 'monospace', fontSize: 12, fontWeight: '700' }}>
+      <Text className="text-xs font-bold" style={{ color: colors.foreground, fontFamily: 'monospace' }}>
         EXTRACTION SUMMARY
       </Text>
       <View className="mt-3 gap-1">
-        <Text style={{ color: colors.muted, fontFamily: 'monospace', fontSize: 11 }}>
+        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
           {`"vendor": ${summaryVendor ? `"${summaryVendor}"` : 'null'}`}
         </Text>
-        <Text style={{ color: colors.muted, fontFamily: 'monospace', fontSize: 11 }}>
+        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
           {`"date": ${summaryDate ? `"${summaryDate}"` : 'null'}`}
         </Text>
-        <Text style={{ color: colors.muted, fontFamily: 'monospace', fontSize: 11 }}>
+        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
           {`"total": ${
             summaryTotal !== null && summaryTotal !== undefined
               ? `"${summaryTotal.toFixed(2)} ${previewData?.extracted.currency ?? 'VND'}"`
               : 'null'
           }`}
         </Text>
-        <Text style={{ color: colors.muted, fontFamily: 'monospace', fontSize: 11 }}>{`"status": "${summaryStatus}"`}</Text>
+        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>{`"status": "${summaryStatus}"`}</Text>
         {!summaryVendor && summarySnippet ? (
-          <Text style={{ color: colors.muted, fontFamily: 'monospace', fontSize: 10 }}>
+          <Text className="text-2xs" style={{ color: colors.muted, fontFamily: 'monospace' }}>
             {`"text": "${summarySnippet}${previewData?.rawText && previewData.rawText.length > 42 ? '…' : ''}"`}
           </Text>
         ) : null}

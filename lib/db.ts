@@ -40,6 +40,8 @@ async function runSchemaMigrations(
     CREATE TABLE IF NOT EXISTS invoices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       image_uri TEXT NOT NULL,
+      image_base64 TEXT,
+      image_mime TEXT,
       raw_text TEXT,
       scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       status TEXT DEFAULT 'pending'
@@ -72,6 +74,32 @@ async function runSchemaMigrations(
       total_price REAL
     );
   `);
+
+  const versionRow = await database.getFirstAsync<{ user_version: number }>(
+    "PRAGMA user_version;",
+  );
+  const userVersion = versionRow?.user_version ?? 0;
+
+  if (userVersion < 1) {
+    const tableInfo = await database.getAllAsync<
+      Record<string, SQLite.SQLiteBindValue>
+    >("PRAGMA table_info(invoices);");
+    const invoiceColumns = new Set(
+      tableInfo.map((column) => String(column.name)),
+    );
+
+    if (!invoiceColumns.has("image_base64")) {
+      await database.execAsync(
+        "ALTER TABLE invoices ADD COLUMN image_base64 TEXT;",
+      );
+    }
+
+    if (!invoiceColumns.has("image_mime")) {
+      await database.execAsync("ALTER TABLE invoices ADD COLUMN image_mime TEXT;");
+    }
+
+    await database.execAsync("PRAGMA user_version = 1;");
+  }
 }
 
 async function getReadyDatabase(): Promise<SQLite.SQLiteDatabase | null> {
@@ -101,6 +129,8 @@ function mapInvoiceListItem(
     raw_text: row.raw_text ? String(row.raw_text) : null,
     scanned_at: String(row.scanned_at),
     status: String(row.status) as InvoiceListItem["status"],
+    image_base64: null,
+    image_mime: null,
     vendor_name: row.vendor_name ? String(row.vendor_name) : null,
     invoice_number: row.invoice_number ? String(row.invoice_number) : null,
     invoice_date: row.invoice_date ? String(row.invoice_date) : null,
@@ -153,8 +183,14 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   }
 
   const createdInvoice = await database.runAsync(
-    "INSERT INTO invoices (image_uri, raw_text, status) VALUES (?, ?, ?)",
-    [input.imageUri, input.rawText, input.status],
+    "INSERT INTO invoices (image_uri, image_base64, image_mime, raw_text, status) VALUES (?, ?, ?, ?, ?)",
+    [
+      input.imageUri,
+      input.imageBase64 ?? null,
+      input.imageMime ?? null,
+      input.rawText,
+      input.status,
+    ],
   );
 
   const invoiceId = Number(createdInvoice?.lastInsertRowId);
@@ -317,6 +353,8 @@ export async function getInvoiceById(
     `SELECT
       invoices.id,
       invoices.image_uri,
+      invoices.image_base64,
+      invoices.image_mime,
       invoices.raw_text,
       invoices.scanned_at,
       invoices.status,
@@ -348,6 +386,8 @@ export async function getInvoiceById(
   return {
     id: Number(row.id),
     image_uri: String(row.image_uri),
+    image_base64: row.image_base64 ? String(row.image_base64) : null,
+    image_mime: row.image_mime ? String(row.image_mime) : null,
     raw_text: row.raw_text ? String(row.raw_text) : null,
     scanned_at: String(row.scanned_at),
     status: String(row.status) as InvoiceRow["status"],
@@ -412,6 +452,21 @@ export async function deleteInvoice(invoiceId: number): Promise<void> {
   }
 
   await database.runAsync("DELETE FROM invoices WHERE id = ?", [invoiceId]);
+}
+
+export async function deleteNonFinalInvoices(): Promise<number> {
+  const database = await getReadyDatabase();
+
+  if (!database) {
+    return 0;
+  }
+
+  const result = await database.runAsync(
+    "DELETE FROM invoices WHERE status NOT IN (?, ?)",
+    ["success", "error"],
+  );
+
+  return result.changes ?? 0;
 }
 
 export async function getInvoiceCount(): Promise<number> {

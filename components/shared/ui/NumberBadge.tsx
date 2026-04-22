@@ -15,7 +15,9 @@ export function NumberBadge({ value }: NumberBadgeProps) {
     <View
       className="h-9 w-9 items-center justify-center rounded-full"
       style={{ backgroundColor: colors.foreground }}>
-      <Text style={{ color: colors.background, fontSize: 14, fontWeight: '800' }}>{value}</Text>
+      <Text className="text-sm font-extrabold" style={{ color: colors.background }}>
+        {value}
+      </Text>
     </View>
   );
 }

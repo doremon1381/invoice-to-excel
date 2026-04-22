@@ -1,11 +1,14 @@
 import { Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/shared/ui/icon-symbol";
+import { Typography } from "@/constants/typography";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
@@ -19,7 +22,7 @@ export default function TabLayout() {
         },
         headerTitleStyle: {
           color: colors.foreground,
-          fontSize: 20,
+          fontSize: Typography.xl.size,
           fontWeight: "700",
         },
         headerTintColor: colors.foreground,
@@ -43,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tabs.home"),
           headerShown: false,
           tabBarIcon: ({ focused }) => (
             <IconSymbol
@@ -57,8 +60,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="scan"
         options={{
-          title: "Scan",
-          headerTitle: "Scan Invoice",
+          title: t("tabs.scan"),
+          headerTitle: t("tabs.scanInvoice"),
           tabBarIcon: ({ focused }) => (
             <IconSymbol
               name="camera.fill"
@@ -71,8 +74,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
-          headerTitle: "Settings",
+          title: t("tabs.settings"),
+          headerTitle: t("tabs.settings"),
           headerShown: false,
           tabBarIcon: ({ focused }) => (
             <IconSymbol

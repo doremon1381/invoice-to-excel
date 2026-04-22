@@ -5,9 +5,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset, MediaTypeOptions } from 'expo-image-picker';
 import { useCallback, useState, type RefObject } from 'react';
 
-import { extractInvoiceData } from '@/lib/openai';
 import { IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH, OPENAI_API_KEY } from '@/lib/constants';
-import { saveInvoice } from '@/lib/db';
+import { i18n } from '@/lib/i18n';
+import { extractInvoiceData } from '@/lib/openai';
 import type { ExtractedInvoice, InvoiceStatus } from '@/lib/types';
 
 async function prepareImage(asset: ImagePickerAsset): Promise<{ uri: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp'; base64: string }> {
@@ -53,9 +53,13 @@ export interface ScanPreviewData {
   status: InvoiceStatus;
 }
 
-interface ScanResult {
-  invoiceId: number;
+export interface ScanResult {
   imageUri: string;
+  imageBase64: string;
+  imageMime: 'image/jpeg' | 'image/png' | 'image/webp';
+  extracted: ExtractedInvoice;
+  rawText: string;
+  status: InvoiceStatus;
 }
 
 function toPreviewData(extracted: ExtractedInvoice, rawText: string, status: InvoiceStatus): ScanPreviewData {
@@ -90,7 +94,7 @@ export function useInvoiceScan() {
     const apiKey = getTestingApiKey();
 
     if (!apiKey) {
-      throw new Error('OpenAI test API key is not configured.');
+      throw new Error(i18n.t('scan.errorNoApiKey'));
     }
 
     setIsLoading(true);
@@ -107,21 +111,20 @@ export function useInvoiceScan() {
       //Alert.alert('debug - rawText', rawText.toString());
 
       const status = deriveStatus(extracted);
+      const normalizedRawText = deriveRawText(extracted, rawText);
       setPreviewData(toPreviewData(extracted, rawText, status));
 
-      const invoiceId = await saveInvoice({
-        imageUri: preparedImage.uri,
-        rawText: deriveRawText(extracted, rawText),
-        status,
-        extracted,
-      });
-
       return {
-        invoiceId,
         imageUri: preparedImage.uri,
+        imageBase64: preparedImage.base64,
+        imageMime: preparedImage.mimeType,
+        extracted,
+        rawText: normalizedRawText,
+        status,
       };
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : 'Failed to scan invoice.';
+      const message =
+        caughtError instanceof Error ? caughtError.message : i18n.t('scan.errorGenericScan');
       setPreviewData(null);
       setError(message);
       throw new Error(message);
@@ -134,7 +137,7 @@ export function useInvoiceScan() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      throw new Error('Photo library permission is required to choose an invoice image.');
+      throw new Error(i18n.t('scan.errorPhotoPermission'));
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -154,7 +157,7 @@ export function useInvoiceScan() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
-      throw new Error('Camera permission is required to take an invoice photo.');
+      throw new Error(i18n.t('scan.errorCameraPermission'));
     }
 
     const result = await ImagePicker.launchCameraAsync({
@@ -175,7 +178,7 @@ export function useInvoiceScan() {
       const camera = cameraRef.current;
 
       if (!camera) {
-        throw new Error('Camera is not ready yet.');
+        throw new Error(i18n.t('scan.errorCameraNotReady'));
       }
 
       const picture = await camera.takePictureAsync({ quality: 1, skipProcessing: false });

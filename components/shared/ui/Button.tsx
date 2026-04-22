@@ -1,6 +1,5 @@
-import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
-import { ThemedText } from '@/components/shared/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
@@ -27,6 +26,13 @@ export function Button({
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const isDisabled = disabled || loading;
+
+  const labelColor =
+    variant === 'secondary'
+      ? colors.foreground
+      : variant === 'destructive'
+        ? colors.onDanger
+        : colors.onAccent;
 
   return (
     <Pressable
@@ -59,14 +65,9 @@ export function Button({
       }}
       {...props}
     >
-      <ThemedText
-        style={{
-          color: variant === 'secondary' ? colors.foreground : colors.onAccent,
-          fontWeight: '700',
-        }}
-      >
+      <Text style={{ color: labelColor, fontWeight: '700' }}>
         {loading ? `${label}...` : label}
-      </ThemedText>
+      </Text>
     </Pressable>
   );
 }

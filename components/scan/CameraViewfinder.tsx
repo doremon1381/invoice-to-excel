@@ -78,7 +78,7 @@ function CornerBracket({ color, position }: { color: string; position: 'bl' | 'b
 type CameraViewfinderProps = {
   bracketColor: string;
   cameraRef: RefObject<InstanceType<typeof CameraView> | null>;
-  colors: (typeof Colors)['dark'];
+  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
   facing: CameraType;
   isCameraReady: boolean;
   onCameraReady: () => void;
@@ -111,7 +111,7 @@ export function CameraViewfinder({
         <Image resizeMode="cover" source={{ uri: staticImageUri }} style={{ flex: 1 }} />
       ) : (
         <View className="flex-1 items-center justify-center px-6" style={{ backgroundColor: colors.surface }}>
-          <Text style={{ color: colors.muted, fontSize: 14, textAlign: 'center' }}>
+          <Text className="text-center text-sm" style={{ color: colors.muted }}>
             {Platform.OS === 'web'
               ? 'Live camera is not available in the browser. Use Import to choose an image.'
               : 'Camera preview unavailable.'}

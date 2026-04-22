@@ -1,4 +1,4 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Text, type TextProps } from 'react-native';
 
 import { useThemeColor } from '@/hooks/theme/use-theme-color';
 
@@ -15,70 +15,60 @@ export type ThemedTextProps = TextProps & {
     | 'heading'
     | 'body'
     | 'caption'
-    | 'overline';
+    | 'overline'
+    /** No preset `text-*` size; use `className` for typography (e.g. stats with `text-display`). */
+    | 'custom';
 };
+
+function typeClassName(type: ThemedTextProps['type']): string {
+  switch (type) {
+    case 'custom':
+      return '';
+    case 'default':
+    case 'body':
+      return 'text-base';
+    case 'defaultSemiBold':
+      return 'text-base font-semibold';
+    case 'title':
+    case 'display':
+      return 'text-display-lg font-bold';
+    case 'subtitle':
+    case 'heading':
+      return 'text-xl font-bold';
+    case 'caption':
+      return 'text-caption';
+    case 'overline':
+      return 'text-xs font-bold tracking-wider uppercase';
+    case 'link':
+      return 'text-base';
+    default:
+      return 'text-base';
+  }
+}
 
 export function ThemedText({
   style,
   lightColor,
   darkColor,
   type = 'default',
+  className,
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'foreground');
   const linkColor = useThemeColor({}, 'accent');
 
+  const typographyClass = typeClassName(type);
+  const mergedClassName = [typographyClass, className].filter(Boolean).join(' ');
+
   return (
     <Text
+      className={mergedClassName}
       style={[
         { color },
-        type === 'default' || type === 'body' ? styles.body : undefined,
-        type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
-        type === 'title' || type === 'display' ? styles.display : undefined,
-        type === 'subtitle' || type === 'heading' ? styles.heading : undefined,
-        type === 'caption' ? styles.caption : undefined,
-        type === 'overline' ? styles.overline : undefined,
-        type === 'link' ? [styles.link, { color: linkColor }] : undefined,
+        type === 'link' ? { color: linkColor } : undefined,
         style,
       ]}
       {...rest}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  body: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  defaultSemiBold: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-  display: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    lineHeight: 26,
-  },
-  caption: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  overline: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 16,
-  },
-});

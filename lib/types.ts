@@ -29,6 +29,8 @@ export interface ExtractedInvoice {
 export interface InvoiceRow {
   id: number;
   image_uri: string;
+  image_base64: string | null;
+  image_mime: string | null;
   raw_text: string | null;
   scanned_at: string;
   status: InvoiceStatus;
@@ -65,6 +67,8 @@ export interface InvoiceDetail extends InvoiceRow, ExtractedInvoice {
 
 export interface SaveInvoiceInput {
   imageUri: string;
+  imageBase64?: string | null;
+  imageMime?: string | null;
   rawText: string;
   status: InvoiceStatus;
   extracted: ExtractedInvoice;

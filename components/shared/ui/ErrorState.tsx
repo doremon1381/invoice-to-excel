@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/shared/themed-text';
 import { Card } from '@/components/shared/ui/Card';
@@ -17,9 +18,11 @@ type ErrorStateProps = {
 export function ErrorState({
   message,
   onRetry,
-  retryLabel = 'Retry',
+  retryLabel: retryLabelProp,
   variant = 'default',
 }: ErrorStateProps) {
+  const { t } = useTranslation();
+  const retryLabel = retryLabelProp ?? t('common.retry');
   const colorScheme = useColorScheme() ?? 'light';
   const colors = variant === 'dark' ? Colors.dark : Colors[colorScheme];
 

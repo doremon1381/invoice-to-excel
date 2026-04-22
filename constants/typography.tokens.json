@@ -1,0 +1,13 @@
+{
+  "2xs": { "size": 10, "lineHeight": 14 },
+  "tiny": { "size": 11, "lineHeight": 15 },
+  "xs": { "size": 12, "lineHeight": 16 },
+  "caption": { "size": 13, "lineHeight": 18 },
+  "sm": { "size": 14, "lineHeight": 20 },
+  "md": { "size": 15, "lineHeight": 20 },
+  "base": { "size": 16, "lineHeight": 24 },
+  "lead": { "size": 17, "lineHeight": 24 },
+  "xl": { "size": 20, "lineHeight": 26 },
+  "display": { "size": 28, "lineHeight": 30 },
+  "displayLg": { "size": 32, "lineHeight": 32 }
+}

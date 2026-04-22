@@ -1,10 +1,11 @@
 import { Image, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { IconSymbol } from '@/components/shared/ui/icon-symbol';
 import type { Colors } from '@/constants/theme';
 
 type ScanControlsProps = {
-  colors: (typeof Colors)['dark'];
+  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
   onCapture: () => void;
   onImport: () => void;
   onRescan: () => void;
@@ -12,10 +13,12 @@ type ScanControlsProps = {
 };
 
 export function ScanControls({ colors, onCapture, onImport, onRescan, previewUri }: ScanControlsProps) {
+  const { t } = useTranslation();
+
   return (
     <View className="flex-row items-end justify-between gap-5 pb-2">
       <Pressable
-        accessibilityLabel="Import from gallery"
+        accessibilityLabel={t('scan.a11yImportGallery')}
         accessibilityRole="button"
         className="h-14 w-14 items-center justify-center rounded-2xl border"
         onPress={onImport}
@@ -32,7 +35,7 @@ export function ScanControls({ colors, onCapture, onImport, onRescan, previewUri
       </Pressable>
 
       <Pressable
-        accessibilityLabel="Capture invoice"
+        accessibilityLabel={t('scan.a11yCapture')}
         accessibilityRole="button"
         className="h-24 w-24 items-center justify-center rounded-full border-[6px]"
         onPress={onCapture}
@@ -50,7 +53,7 @@ export function ScanControls({ colors, onCapture, onImport, onRescan, previewUri
       </Pressable>
 
       <Pressable
-        accessibilityLabel="Clear preview and start over"
+        accessibilityLabel={t('scan.a11yRescan')}
         accessibilityRole="button"
         className="h-14 w-14 items-center justify-center rounded-full border"
         onPress={onRescan}

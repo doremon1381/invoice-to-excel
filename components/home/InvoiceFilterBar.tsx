@@ -48,11 +48,10 @@ export function InvoiceFilterBar({
             }}
           >
             <ThemedText
+              type="custom"
+              className="text-center text-caption font-bold"
               style={{
                 color: isActive ? colors.foreground : colors.muted,
-                fontSize: 13,
-                fontWeight: '700',
-                textAlign: 'center',
               }}
             >
               {option.label}

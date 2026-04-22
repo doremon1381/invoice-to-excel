@@ -1,9 +1,11 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, View, useWindowDimensions } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Alert, FlatList, Pressable, View } from "react-native";
 
-import { DashboardOverview } from "@/components/home/DashboardOverview";
+import { ExpenseOverview } from "@/components/home/ExpenseOverview";
 import { InvoiceFilterBar } from "@/components/home/InvoiceFilterBar";
+import { ScanCallToAction } from "@/components/home/ScanCallToAction";
 import { InvoiceCard } from "@/components/invoice/InvoiceCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ThemedText } from "@/components/shared/themed-text";
@@ -18,48 +20,65 @@ import {
   getAllInvoicesWithData,
   initializeDatabase,
 } from "@/lib/db";
+import { computeMonthlyExpense } from "@/lib/monthlyExpense";
 import type { InvoiceListItem } from "@/lib/types";
 
 type FilterValue = "all" | "exported";
 
-const FILTER_OPTIONS: { label: string; value: FilterValue }[] = [
-  { label: "All Invoices", value: "all" },
-  { label: "Exported", value: "exported" },
-];
-
 export default function HomeScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isCompactHero = width < 360;
+  const { t } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterValue>("all");
+  const hasLoadedOnceRef = useRef(false);
 
-  const loadInvoices = useCallback(async () => {
-    setIsLoading(true);
+  const filterOptions = useMemo(
+    () => [
+      { label: t("home.filterAll"), value: "all" as const },
+      { label: t("home.filterExported"), value: "exported" as const },
+    ],
+    [t],
+  );
+
+  const loadInvoices = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
+    if (silent) {
+      setIsRefreshing(true);
+    } else {
+      setIsInitialLoading(true);
+    }
+
     setError(null);
 
     try {
       await initializeDatabase();
       const nextInvoices = await getAllInvoicesWithData();
       setInvoices(nextInvoices);
+      hasLoadedOnceRef.current = true;
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to load invoices.",
+          : t("home.loadError"),
       );
     } finally {
-      setIsLoading(false);
+      if (silent) {
+        setIsRefreshing(false);
+      } else {
+        setIsInitialLoading(false);
+      }
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadInvoices();
+      void loadInvoices({ silent: hasLoadedOnceRef.current });
     }, [loadInvoices]),
   );
 
@@ -74,31 +93,33 @@ export default function HomeScreen() {
 
     return invoices;
   }, [filter, invoices, readyInvoices]);
+
+  const monthlyExpense = useMemo(
+    () => computeMonthlyExpense(invoices),
+    [invoices],
+  );
+
   function handleDelete(invoiceId: number) {
-    Alert.alert(
-      "Delete invoice",
-      "Are you sure you want to delete this invoice?",
-      [
-        { style: "cancel", text: "Cancel" },
-        {
-          style: "destructive",
-          text: "Delete",
-          onPress: async () => {
-            try {
-              await deleteInvoice(invoiceId);
-              await loadInvoices();
-            } catch (caughtError) {
-              Alert.alert(
-                "Delete failed",
-                caughtError instanceof Error
-                  ? caughtError.message
-                  : "Unable to delete the invoice.",
-              );
-            }
-          },
+    Alert.alert(t("alerts.homeDeleteTitle"), t("alerts.homeDeleteMessage"), [
+      { style: "cancel", text: t("common.cancel") },
+      {
+        style: "destructive",
+        text: t("common.delete"),
+        onPress: async () => {
+          try {
+            await deleteInvoice(invoiceId);
+            await loadInvoices({ silent: true });
+          } catch (caughtError) {
+            Alert.alert(
+              t("alerts.homeDeleteFailed"),
+              caughtError instanceof Error
+                ? caughtError.message
+                : t("alerts.homeDeleteFailedMessage"),
+            );
+          }
         },
-      ],
-    );
+      },
+    ]);
   }
 
   return (
@@ -107,10 +128,10 @@ export default function HomeScreen() {
         <View className="mb-4 flex-row items-center justify-between">
           <View />
           <Pressable
-            accessibilityLabel="Open settings"
+            accessibilityLabel={t("home.openSettingsA11y")}
             accessibilityRole="button"
             className="h-10 w-10 items-center justify-center rounded-full"
-            onPress={() => router.push("/settings")}
+            onPress={() => router.push("/(tabs)/settings")}
             style={({ pressed }) => ({
               backgroundColor: colors.surface,
               borderColor: colors.border,
@@ -118,50 +139,59 @@ export default function HomeScreen() {
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <IconSymbol name="gearshape.fill" size={18} color={colors.foreground} />
+            <IconSymbol
+              name="gearshape.fill"
+              size={18}
+              color={colors.foreground}
+            />
           </Pressable>
         </View>
 
-        <View className="mb-4">
-          <DashboardOverview
-            isCompact={isCompactHero}
-            onScanPress={() => router.push("/scan")}
+        <View className="mb-4 flex flex-row gap-4">
+          <ExpenseOverview
+            currency={monthlyExpense.currency}
+            monthDate={monthlyExpense.monthDate}
+            totalAmount={monthlyExpense.totalAmount}
           />
+          <ScanCallToAction onPress={() => router.push("/scan")} />
         </View>
 
         {error ? (
           <View className="mb-4">
-            <ErrorState message={error} onRetry={() => void loadInvoices()} />
+            <ErrorState
+              message={error}
+              onRetry={() => void loadInvoices({ silent: false })}
+            />
           </View>
         ) : null}
 
         <InvoiceFilterBar
           activeValue={filter}
           onChange={(value) => setFilter(value as FilterValue)}
-          options={FILTER_OPTIONS}
+          options={filterOptions}
         />
 
-        {isLoading ? (
-          <LoadingState message="Loading invoices..." />
+        {isInitialLoading && invoices.length === 0 ? (
+          <LoadingState message={t("home.loadingInvoices")} />
         ) : filteredInvoices.length === 0 ? (
           <View className="flex-1">
             <EmptyState
               title={
                 filter === "all"
-                  ? "No invoices yet"
-                  : "No export-ready invoices"
+                  ? t("empty.noInvoicesTitle")
+                  : t("empty.noExportReadyTitle")
               }
               description={
                 filter === "all"
-                  ? "Scan a paper invoice or import one from your gallery to start building your local invoice archive."
-                  : "Successful invoice scans will appear here when they are ready to export."
+                  ? t("empty.noInvoicesDescription")
+                  : t("empty.noExportReadyDescription")
               }
             />
             <ThemedText
               className="mt-3 text-center"
               style={{ color: colors.muted }}
             >
-              Export options are available in the Database Management screen.
+              {t("home.exportHint")}
             </ThemedText>
           </View>
         ) : (
@@ -170,13 +200,15 @@ export default function HomeScreen() {
             contentContainerClassName="pb-6"
             data={filteredInvoices}
             keyExtractor={(item) => String(item.id)}
-            onRefresh={() => void loadInvoices()}
-            refreshing={isLoading}
+            onRefresh={() => void loadInvoices({ silent: true })}
+            refreshing={isRefreshing}
             renderItem={({ item }) => (
               <InvoiceCard
                 invoice={item}
+                onConfirm={() => router.push(`/invoice/${item.id}`)}
                 onDelete={() => handleDelete(item.id)}
                 onPress={() => router.push(`/invoice/${item.id}`)}
+                onRescan={() => router.replace("/(tabs)/scan")}
               />
             )}
             showsVerticalScrollIndicator={false}

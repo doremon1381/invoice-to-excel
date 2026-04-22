@@ -1,0 +1,30 @@
+/**
+ * Locale-aware amount formatting for dashboard and list displays.
+ * Returns numeric string and ISO currency code separately for split styling.
+ */
+export function formatMoney(
+  amount: number,
+  currency: string,
+  locale: string,
+): { value: string; currency: string } {
+  const upper = currency.trim().toUpperCase();
+  const isZeroFraction = upper === "VND" || upper === "JPY";
+
+  const formatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: isZeroFraction ? 0 : 2,
+    maximumFractionDigits: isZeroFraction ? 0 : 2,
+  });
+
+  return { value: formatter.format(amount), currency: upper };
+}
+
+export function formatCurrency(value: number | null, currency: string): string {
+  if (value === null) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: currency.trim().toUpperCase(),
+  }).format(value);
+}
