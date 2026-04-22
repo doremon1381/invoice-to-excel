@@ -207,6 +207,7 @@ export function parseOcrText(rawText: string): { extracted: ExtractedInvoice; st
     discount_amount: findAmount(lines, ['discount']),
     total_amount: findAmount(lines, ['total', 'amount due', 'grand total']),
     currency: findCurrency(rawText),
+    payer: null,
     payment_method: findLabeledValue(lines, [/payment\s*method[:\s-]+(.+)/i]),
     notes: rawText.trim(),
     line_items: [],
@@ -229,7 +230,28 @@ export function parseExtractedJSON(raw: string): ExtractedInvoice {
     .trim();
 
   try {
-    return JSON.parse(cleaned) as ExtractedInvoice;
+    const parsedValue = JSON.parse(cleaned) as Record<string, unknown>;
+    const lineItems = Array.isArray(parsedValue.line_items)
+      ? parsedValue.line_items.map(normalizeLineItem)
+      : [];
+
+    return {
+      vendor_name: normalizeNullableString(parsedValue.vendor_name),
+      vendor_address: normalizeNullableString(parsedValue.vendor_address),
+      invoice_number: normalizeNullableString(parsedValue.invoice_number),
+      invoice_date: normalizeNullableString(parsedValue.invoice_date),
+      due_date: normalizeNullableString(parsedValue.due_date),
+      subtotal: normalizeNullableNumber(parsedValue.subtotal),
+      tax_amount: normalizeNullableNumber(parsedValue.tax_amount),
+      discount_amount: normalizeNullableNumber(parsedValue.discount_amount),
+      total_amount: normalizeNullableNumber(parsedValue.total_amount),
+      currency:
+        normalizeNullableString(parsedValue.currency) ?? DEFAULT_CURRENCY,
+      payer: normalizeNullableString(parsedValue.payer),
+      payment_method: normalizeNullableString(parsedValue.payment_method),
+      notes: normalizeNullableString(parsedValue.notes),
+      line_items: lineItems,
+    };
   } catch {
     throw new Error(`Failed to parse model response as JSON:\n${cleaned}`);
   }

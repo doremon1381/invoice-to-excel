@@ -39,6 +39,7 @@ async function runSchemaMigrations(
 
     CREATE TABLE IF NOT EXISTS invoices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_name TEXT,
       image_uri TEXT NOT NULL,
       image_base64 TEXT,
       image_mime TEXT,
@@ -60,6 +61,7 @@ async function runSchemaMigrations(
       discount_amount REAL,
       total_amount REAL,
       currency TEXT DEFAULT 'VND',
+      payer TEXT,
       payment_method TEXT,
       notes TEXT
     );
@@ -100,6 +102,38 @@ async function runSchemaMigrations(
 
     await database.execAsync("PRAGMA user_version = 1;");
   }
+
+  if (userVersion < 2) {
+    const tableInfo = await database.getAllAsync<
+      Record<string, SQLite.SQLiteBindValue>
+    >("PRAGMA table_info(invoice_data);");
+    const invoiceDataColumns = new Set(
+      tableInfo.map((column) => String(column.name)),
+    );
+
+    if (!invoiceDataColumns.has("payer")) {
+      await database.execAsync("ALTER TABLE invoice_data ADD COLUMN payer TEXT;");
+    }
+
+    await database.execAsync("PRAGMA user_version = 2;");
+  }
+
+  if (userVersion < 3) {
+    const tableInfo = await database.getAllAsync<
+      Record<string, SQLite.SQLiteBindValue>
+    >("PRAGMA table_info(invoices);");
+    const invoiceColumns = new Set(
+      tableInfo.map((column) => String(column.name)),
+    );
+
+    if (!invoiceColumns.has("invoice_name")) {
+      await database.execAsync(
+        "ALTER TABLE invoices ADD COLUMN invoice_name TEXT;",
+      );
+    }
+
+    await database.execAsync("PRAGMA user_version = 3;");
+  }
 }
 
 async function getReadyDatabase(): Promise<SQLite.SQLiteDatabase | null> {
@@ -125,6 +159,7 @@ function mapInvoiceListItem(
 ): InvoiceListItem {
   return {
     id: Number(row.id),
+    invoice_name: row.invoice_name ? String(row.invoice_name) : null,
     image_uri: String(row.image_uri),
     raw_text: row.raw_text ? String(row.raw_text) : null,
     scanned_at: String(row.scanned_at),
@@ -183,8 +218,9 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
   }
 
   const createdInvoice = await database.runAsync(
-    "INSERT INTO invoices (image_uri, image_base64, image_mime, raw_text, status) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO invoices (invoice_name, image_uri, image_base64, image_mime, raw_text, status) VALUES (?, ?, ?, ?, ?, ?)",
     [
+      input.invoiceName,
       input.imageUri,
       input.imageBase64 ?? null,
       input.imageMime ?? null,
@@ -209,9 +245,10 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
       discount_amount,
       total_amount,
       currency,
+      payer,
       payment_method,
       notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       invoiceId,
       extracted.vendor_name,
@@ -224,6 +261,7 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
       extracted.discount_amount,
       extracted.total_amount,
       extracted.currency,
+      extracted.payer,
       extracted.payment_method,
       extracted.notes,
     ],
@@ -249,6 +287,7 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
 export async function updateInvoice(
   invoiceId: number,
   patch: {
+    invoiceName?: string | null;
     extracted: ExtractedInvoice;
     rawText?: string | null;
     status?: InvoiceStatus;
@@ -274,6 +313,13 @@ export async function updateInvoice(
     ]);
   }
 
+  if (patch.invoiceName !== undefined) {
+    await database.runAsync(
+      "UPDATE invoices SET invoice_name = ? WHERE id = ?",
+      [patch.invoiceName, invoiceId],
+    );
+  }
+
   const extracted = patch.extracted;
 
   await database.runAsync(
@@ -288,6 +334,7 @@ export async function updateInvoice(
       discount_amount = ?,
       total_amount = ?,
       currency = ?,
+      payer = ?,
       payment_method = ?,
       notes = ?
     WHERE invoice_id = ?`,
@@ -302,6 +349,7 @@ export async function updateInvoice(
       extracted.discount_amount,
       extracted.total_amount,
       extracted.currency,
+      extracted.payer,
       extracted.payment_method,
       extracted.notes,
       invoiceId,
@@ -321,6 +369,7 @@ export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
   >(`
     SELECT
       invoices.id,
+      invoices.invoice_name,
       invoices.image_uri,
       invoices.raw_text,
       invoices.scanned_at,
@@ -352,6 +401,7 @@ export async function getInvoiceById(
   >(
     `SELECT
       invoices.id,
+      invoices.invoice_name,
       invoices.image_uri,
       invoices.image_base64,
       invoices.image_mime,
@@ -368,6 +418,7 @@ export async function getInvoiceById(
       invoice_data.discount_amount,
       invoice_data.total_amount,
       invoice_data.currency,
+      invoice_data.payer,
       invoice_data.payment_method,
       invoice_data.notes
     FROM invoices
@@ -385,6 +436,7 @@ export async function getInvoiceById(
 
   return {
     id: Number(row.id),
+    invoice_name: row.invoice_name ? String(row.invoice_name) : null,
     image_uri: String(row.image_uri),
     image_base64: row.image_base64 ? String(row.image_base64) : null,
     image_mime: row.image_mime ? String(row.image_mime) : null,
@@ -421,6 +473,7 @@ export async function getInvoiceById(
           ? Number(row.total_amount)
           : null,
     currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
+    payer: row.payer ? String(row.payer) : null,
     payment_method: row.payment_method ? String(row.payment_method) : null,
     notes: row.notes ? String(row.notes) : null,
     line_items: lineItems,
@@ -494,6 +547,7 @@ export function createPendingInvoice(imageUri: string): ExtractedInvoice {
     discount_amount: null,
     total_amount: null,
     currency: DEFAULT_CURRENCY,
+    payer: null,
     payment_method: null,
     notes: null,
     line_items: [],

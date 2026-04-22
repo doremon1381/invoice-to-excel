@@ -114,8 +114,15 @@
     "structuredReview": "Kiểm tra có cấu trúc",
     "structuredReviewHint": "Xác minh các trường do AI trích xuất trước khi dùng để xuất.",
     "vendorDetails": "Chi tiết nhà cung cấp",
+    "labelInvoiceName": "Tên hóa đơn",
+    "placeholderInvoiceName": "Nhập tên hóa đơn",
     "labelVendor": "Nhà cung cấp",
     "labelContent": "Nội dung",
+    "labelPayer": "Người thanh toán",
+    "payerGroup": "quỹ nhóm",
+    "payerTu": "Tú",
+    "payerOther": "Khác",
+    "payerCustomPlaceholder": "Nhập tên người thanh toán",
     "placeholderVendorContext": "Địa chỉ hoặc thông tin thêm",
     "transaction": "Giao dịch",
     "labelDate": "Ngày",
@@ -155,7 +162,9 @@
     "alertExportFailed": "Xuất thất bại",
     "alertExportFailedMessage": "Không thể xuất hóa đơn.",
     "alertSaveFailed": "Lưu thất bại",
-    "alertSaveFailedMessage": "Không thể lưu thay đổi."
+    "alertSaveFailedMessage": "Không thể lưu thay đổi.",
+    "alertInvoiceNameRequired": "Tên hóa đơn là bắt buộc",
+    "alertInvoiceNameRequiredMessage": "Vui lòng nhập tên hóa đơn trước khi xác nhận."
   },
   "financial": {
     "subtotal": "Tạm tính",

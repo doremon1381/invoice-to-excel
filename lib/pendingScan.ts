@@ -1,6 +1,7 @@
 import type { ExtractedInvoice, InvoiceStatus } from "@/lib/types";
 
 export interface PendingScanPayload {
+  invoiceName: string | null;
   extracted: ExtractedInvoice;
   rawText: string;
   status: InvoiceStatus;

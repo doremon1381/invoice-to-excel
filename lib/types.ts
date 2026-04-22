@@ -21,6 +21,7 @@ export interface ExtractedInvoice {
   discount_amount: number | null;
   total_amount: number | null;
   currency: string;
+  payer: string | null;
   payment_method: string | null;
   notes: string | null;
   line_items: LineItem[];
@@ -28,6 +29,7 @@ export interface ExtractedInvoice {
 
 export interface InvoiceRow {
   id: number;
+  invoice_name: string | null;
   image_uri: string;
   image_base64: string | null;
   image_mime: string | null;
@@ -49,6 +51,7 @@ export interface InvoiceDataRow {
   discount_amount: number | null;
   total_amount: number | null;
   currency: string;
+  payer: string | null;
   payment_method: string | null;
   notes: string | null;
 }
@@ -66,6 +69,7 @@ export interface InvoiceDetail extends InvoiceRow, ExtractedInvoice {
 }
 
 export interface SaveInvoiceInput {
+  invoiceName: string;
   imageUri: string;
   imageBase64?: string | null;
   imageMime?: string | null;

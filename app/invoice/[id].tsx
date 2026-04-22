@@ -104,9 +104,35 @@ function isInvoiceEditable(status: InvoiceStatus): boolean {
   return status !== "success" && status !== "error";
 }
 
+type PayerOption = "group" | "tu" | "custom";
+
+const GROUP_PAYER_VALUE = "quỹ nhóm";
+const TU_PAYER_VALUE = "Tú";
+
+function derivePayerOption(value: string | null): PayerOption {
+  if (value === GROUP_PAYER_VALUE) {
+    return "group";
+  }
+
+  if (value === TU_PAYER_VALUE) {
+    return "tu";
+  }
+
+  return "custom";
+}
+
+function derivePayerCustomValue(value: string | null): string {
+  if (!value || value === GROUP_PAYER_VALUE || value === TU_PAYER_VALUE) {
+    return "";
+  }
+
+  return value;
+}
+
 function buildPreviewInvoice(payload: PendingScanPayload): InvoiceDetail {
   return {
     id: 0,
+    invoice_name: payload.invoiceName,
     image_uri: payload.imageUri,
     image_base64: payload.imageBase64,
     image_mime: payload.imageMime,
@@ -136,10 +162,13 @@ export default function InvoiceDetailScreen() {
   const [headerImageUri, setHeaderImageUri] = useState<string | null>(null);
 
   const [vendorName, setVendorName] = useState("");
+  const [invoiceName, setInvoiceName] = useState("");
   const [vendorAddress, setVendorAddress] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [totalAmountStr, setTotalAmountStr] = useState("");
   const [taxAmountStr, setTaxAmountStr] = useState("");
+  const [payerOption, setPayerOption] = useState<PayerOption>("custom");
+  const [payerCustomValue, setPayerCustomValue] = useState("");
 
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -197,6 +226,7 @@ export default function InvoiceDetailScreen() {
     }
 
     setHeaderImageUri(invoice.image_uri);
+    setInvoiceName(invoice.invoice_name ?? "");
     setVendorName(invoice.vendor_name ?? "");
     setVendorAddress(invoice.vendor_address ?? "");
     setInvoiceDate(invoice.invoice_date ?? "");
@@ -210,6 +240,8 @@ export default function InvoiceDetailScreen() {
         ? String(invoice.tax_amount)
         : "",
     );
+    setPayerOption(derivePayerOption(invoice.payer));
+    setPayerCustomValue(derivePayerCustomValue(invoice.payer));
   }, [invoice]);
 
   const handleExport = useCallback(async () => {
@@ -265,6 +297,22 @@ export default function InvoiceDetailScreen() {
 
     const totalNum = Number.parseFloat(totalAmountStr);
     const taxNum = Number.parseFloat(taxAmountStr);
+    const trimmedInvoiceName = invoiceName.trim();
+    const trimmedCustomPayer = payerCustomValue.trim();
+    const normalizedPayer =
+      payerOption === "group"
+        ? GROUP_PAYER_VALUE
+        : payerOption === "tu"
+          ? TU_PAYER_VALUE
+          : trimmedCustomPayer || null;
+
+    if (!trimmedInvoiceName) {
+      Alert.alert(
+        t("invoice.alertInvoiceNameRequired"),
+        t("invoice.alertInvoiceNameRequiredMessage"),
+      );
+      return;
+    }
 
     const extracted: ExtractedInvoice = {
       vendor_name: vendorName.trim() || null,
@@ -277,6 +325,7 @@ export default function InvoiceDetailScreen() {
       discount_amount: invoice.discount_amount,
       total_amount: Number.isFinite(totalNum) ? totalNum : null,
       currency: invoice.currency,
+      payer: normalizedPayer,
       payment_method: invoice.payment_method,
       notes: invoice.notes,
       line_items: invoice.line_items,
@@ -294,6 +343,7 @@ export default function InvoiceDetailScreen() {
     try {
       if (isPreviewMode) {
         await saveInvoice({
+          invoiceName: trimmedInvoiceName,
           imageUri: invoice.image_uri,
           imageBase64: invoice.image_base64,
           imageMime: invoice.image_mime,
@@ -303,7 +353,11 @@ export default function InvoiceDetailScreen() {
         });
         clearPendingScan();
       } else {
-        await updateInvoice(invoiceId, { extracted, status });
+        await updateInvoice(invoiceId, {
+          invoiceName: trimmedInvoiceName,
+          extracted,
+          status,
+        });
       }
 
       router.replace("/");
@@ -453,6 +507,16 @@ export default function InvoiceDetailScreen() {
           <View className="gap-4">
             <FieldInput
               editable={canEdit}
+              label={t("invoice.labelInvoiceName")}
+              value={invoiceName}
+              onChangeText={setInvoiceName}
+              placeholder={t("invoice.placeholderInvoiceName")}
+              trailing={
+                <IconSymbol name="pencil" size={20} color={colors.muted} />
+              }
+            />
+            <FieldInput
+              editable={canEdit}
               label={t("invoice.labelVendor")}
               value={vendorName}
               onChangeText={setVendorName}
@@ -467,6 +531,106 @@ export default function InvoiceDetailScreen() {
               onChangeText={setVendorAddress}
               placeholder={t("invoice.placeholderVendorContext")}
             />
+            <View className="gap-2">
+              <ThemedText style={{ color: colors.muted }}>
+                {t("invoice.labelPayer")}
+              </ThemedText>
+              <View className="flex-row gap-2">
+                <Pressable
+                  className="rounded-full border px-3 py-2"
+                  onPress={() => {
+                    if (canEdit) {
+                      setPayerOption("group");
+                    }
+                  }}
+                  style={{
+                    backgroundColor:
+                      payerOption === "group" ? colors.accent : colors.background,
+                    borderColor:
+                      payerOption === "group" ? colors.accent : colors.border,
+                    opacity: canEdit ? 1 : 0.7,
+                  }}
+                >
+                  <ThemedText
+                    type="custom"
+                    className="text-sm"
+                    style={{
+                      color:
+                        payerOption === "group"
+                          ? colors.onAccent
+                          : colors.foreground,
+                    }}
+                  >
+                    {t("invoice.payerGroup")}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  className="rounded-full border px-3 py-2"
+                  onPress={() => {
+                    if (canEdit) {
+                      setPayerOption("tu");
+                    }
+                  }}
+                  style={{
+                    backgroundColor:
+                      payerOption === "tu" ? colors.accent : colors.background,
+                    borderColor:
+                      payerOption === "tu" ? colors.accent : colors.border,
+                    opacity: canEdit ? 1 : 0.7,
+                  }}
+                >
+                  <ThemedText
+                    type="custom"
+                    className="text-sm"
+                    style={{
+                      color:
+                        payerOption === "tu" ? colors.onAccent : colors.foreground,
+                    }}
+                  >
+                    {t("invoice.payerTu")}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  className="rounded-full border px-3 py-2"
+                  onPress={() => {
+                    if (canEdit) {
+                      setPayerOption("custom");
+                    }
+                  }}
+                  style={{
+                    backgroundColor:
+                      payerOption === "custom"
+                        ? colors.accent
+                        : colors.background,
+                    borderColor:
+                      payerOption === "custom" ? colors.accent : colors.border,
+                    opacity: canEdit ? 1 : 0.7,
+                  }}
+                >
+                  <ThemedText
+                    type="custom"
+                    className="text-sm"
+                    style={{
+                      color:
+                        payerOption === "custom"
+                          ? colors.onAccent
+                          : colors.foreground,
+                    }}
+                  >
+                    {t("invoice.payerOther")}
+                  </ThemedText>
+                </Pressable>
+              </View>
+              {payerOption === "custom" ? (
+                <FieldInput
+                  editable={canEdit}
+                  label={t("invoice.payerOther")}
+                  value={payerCustomValue}
+                  onChangeText={setPayerCustomValue}
+                  placeholder={t("invoice.payerCustomPlaceholder")}
+                />
+              ) : null}
+            </View>
           </View>
         </Card>
 
@@ -580,6 +744,14 @@ export default function InvoiceDetailScreen() {
               </ThemedText>
               <ThemedText type="defaultSemiBold">
                 {getDisplayValue(invoice.payment_method)}
+              </ThemedText>
+            </View>
+            <View className="flex-row items-center justify-between">
+              <ThemedText style={{ color: colors.muted }}>
+                {t("invoice.labelPayer")}
+              </ThemedText>
+              <ThemedText type="defaultSemiBold">
+                {getDisplayValue(invoice.payer)}
               </ThemedText>
             </View>
             <View className="flex-row items-center justify-between gap-3">

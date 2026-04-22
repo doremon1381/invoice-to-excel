@@ -54,6 +54,7 @@ export interface ScanPreviewData {
 }
 
 export interface ScanResult {
+  invoiceName: string | null;
   imageUri: string;
   imageBase64: string;
   imageMime: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -115,6 +116,7 @@ export function useInvoiceScan() {
       setPreviewData(toPreviewData(extracted, rawText, status));
 
       return {
+        invoiceName: null,
         imageUri: preparedImage.uri,
         imageBase64: preparedImage.base64,
         imageMime: preparedImage.mimeType,

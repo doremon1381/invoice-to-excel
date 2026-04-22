@@ -67,6 +67,7 @@ export default function ScanScreen() {
       const result = await action();
       if (result) {
         setPendingScan({
+          invoiceName: result.invoiceName,
           extracted: result.extracted,
           imageBase64: result.imageBase64,
           imageMime: result.imageMime,

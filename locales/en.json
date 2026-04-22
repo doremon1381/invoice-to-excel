@@ -114,8 +114,15 @@
     "structuredReview": "Structured review",
     "structuredReviewHint": "Verify AI-extracted fields before they are used for export.",
     "vendorDetails": "Vendor details",
+    "labelInvoiceName": "Invoice name",
+    "placeholderInvoiceName": "Enter invoice name",
     "labelVendor": "Vendor",
     "labelContent": "Content",
+    "labelPayer": "Payer",
+    "payerGroup": "quỹ nhóm",
+    "payerTu": "Tú",
+    "payerOther": "Other",
+    "payerCustomPlaceholder": "Enter payer name",
     "placeholderVendorContext": "Address or extra vendor context",
     "transaction": "Transaction",
     "labelDate": "Date",
@@ -155,7 +162,9 @@
     "alertExportFailed": "Export failed",
     "alertExportFailedMessage": "Unable to export invoice.",
     "alertSaveFailed": "Save failed",
-    "alertSaveFailedMessage": "Unable to save changes."
+    "alertSaveFailedMessage": "Unable to save changes.",
+    "alertInvoiceNameRequired": "Invoice name is required",
+    "alertInvoiceNameRequiredMessage": "Please enter an invoice name before confirming."
   },
   "financial": {
     "subtotal": "Subtotal",
