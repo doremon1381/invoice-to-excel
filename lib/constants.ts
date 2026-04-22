@@ -6,14 +6,16 @@ export const IMAGE_COMPRESS_QUALITY = 0.85;
 export const EXPORT_HISTORY_STORAGE_KEY = "invoice_export_history_v1";
 export const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_secure_v1";
 
-export const OPENAI_BASE_URL = "http://localhost:20128";
-export const OPENAI_API_KEY = "sk-4c6db985c73f9042-bpx046-8a7caa4d";
+export const OPENAI_BASE_URL =
+  "https://platform.beeknoee.com/api/v1/chat/completions";
+export const OPENAI_API_KEY = "sk-bee-971d8086b0514d8dbaa7039457e64462";
 export const OPENAI_MODEL = "gemini-3-flash";
 export const OPENAI_EFFORT_LEVEL_MAX = "max";
 export const OPENAI_EFFORT_LEVEL_HIGH = "high";
 export const OPENAI_EFFORT_LEVEL_MEDIUM = "medium";
 export const OPENAI_EFFORT_LEVEL_LOW = "low";
-//export const MAX_OPENAI_TOKENS = 2048; // TODO: uncomment this when we have a way to estimate the number of tokens
+export const MAX_OPENAI_TOKENS = 16384;
+export const MAX_OPENAI_TOKENS_PER_IMAGE = 16384;
 
 export const EXTRACTION_PROMPT = `You are a financial data extraction specialist. Analyze this invoice image and extract all financial information.
 

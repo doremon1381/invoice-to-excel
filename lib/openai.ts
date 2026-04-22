@@ -1,8 +1,8 @@
 import {
   EXTRACTION_PROMPT,
+  MAX_OPENAI_TOKENS_PER_IMAGE,
   OPENAI_API_KEY,
   OPENAI_BASE_URL,
-  OPENAI_EFFORT_LEVEL_LOW,
   OPENAI_EFFORT_LEVEL_MAX,
   OPENAI_MODEL,
 } from "@/lib/constants";
@@ -35,7 +35,11 @@ function extractMessageText(data: OpenAIChatCompletionResponse): string {
 }
 
 async function callChatCompletions(content: unknown): Promise<string> {
-  const endpoint = `${OPENAI_BASE_URL}/v1/chat/completions`;
+  const endpoint = `${OPENAI_BASE_URL}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 60000);
 
   console.log("debug - start callChatCompletions");
   console.log("debug - request endpoint", endpoint);
@@ -48,8 +52,8 @@ async function callChatCompletions(content: unknown): Promise<string> {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      //max_tokens: MAX_OPENAI_TOKENS, // TODO: uncomment this when we have a way to estimate the number of tokens
-      effort: OPENAI_EFFORT_LEVEL_MAX,
+      max_tokens: MAX_OPENAI_TOKENS_PER_IMAGE,
+      reasoning_effort: OPENAI_EFFORT_LEVEL_MAX,
       temperature: 0,
       messages: [
         {
@@ -58,9 +62,12 @@ async function callChatCompletions(content: unknown): Promise<string> {
         },
       ],
     }),
+    signal: controller.signal,
+  }).finally(() => {
+    clearTimeout(timeoutId);
   });
 
-  console.log("debug - response status", response.status);
+  //console.log("debug - response status", await response.text());
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -85,6 +92,7 @@ export async function extractInvoiceData(
     {
       type: "text",
       text: EXTRACTION_PROMPT,
+      // response_format: { type: "json_object" }, // TODO: uncomment this when we have a way to estimate the number of tokens
     },
     {
       type: "image_url",
@@ -102,34 +110,34 @@ export async function extractInvoiceData(
   };
 }
 
-export async function checkAPIHealth(): Promise<boolean> {
-  try {
-    const response = await fetch(`${OPENAI_BASE_URL}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        //max_tokens: 16, // TODO: uncomment this when we have a way to estimate the number of tokens
-        effort: OPENAI_EFFORT_LEVEL_LOW,
-        temperature: 0,
-        messages: [
-          {
-            role: "user",
-            content: "Reply with ok.",
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(5000),
-    });
+// export async function checkAPIHealth(): Promise<boolean> {
+//   try {
+//     const response = await fetch(`${OPENAI_BASE_URL}/v1/chat/completions`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${OPENAI_API_KEY}`,
+//       },
+//       body: JSON.stringify({
+//         model: OPENAI_MODEL,
+//         max_tokens: MAX_OPENAI_TOKENS,
+//         reasoning_effort: OPENAI_EFFORT_LEVEL_LOW,
+//         temperature: 0,
+//         messages: [
+//           {
+//             role: "user",
+//             content: "Reply with ok.",
+//           },
+//         ],
+//       }),
+//       signal: AbortSignal.timeout(5000),
+//     });
 
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+//     return response.ok;
+//   } catch {
+//     return false;
+//   }
+// }
 
 export async function listModels(): Promise<string[]> {
   return [OPENAI_MODEL];
