@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FinancialSummary } from "@/components/invoice/FinancialSummary";
+import { PushToSheetModal } from "@/components/invoice/PushToSheetModal";
 import { LoadingOverlay } from "@/components/scan/LoadingOverlay";
 import { ThemedText } from "@/components/shared/themed-text";
 import { ThemedView } from "@/components/shared/themed-view";
@@ -30,6 +31,7 @@ import { NumberBadge } from "@/components/shared/ui/NumberBadge";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
 import { Colors } from "@/constants/theme";
 import { useInvoiceExport } from "@/hooks/invoice/useInvoiceExport";
+import { usePushInvoiceToSheet } from "@/hooks/invoice/usePushInvoiceToSheet";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 import { deleteInvoice, getInvoiceById, saveInvoice, updateInvoice } from "@/lib/db";
 import {
@@ -37,6 +39,11 @@ import {
   getPendingScan,
   type PendingScanPayload,
 } from "@/lib/pendingScan";
+import {
+  GoogleAuthRequiredError,
+  loadStoredAccount,
+} from "@/lib/googleAuth";
+import { mapInvoiceToSheetRow } from "@/lib/googleSheets";
 import type {
   ExtractedInvoice,
   InvoiceDetail,
@@ -154,11 +161,13 @@ export default function InvoiceDetailScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { exportSingle, isExporting } = useInvoiceExport();
+  const { isConfigured, isPushing, pushRow } = usePushInvoiceToSheet();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPushModalVisible, setIsPushModalVisible] = useState(false);
   const [headerImageUri, setHeaderImageUri] = useState<string | null>(null);
 
   const [vendorName, setVendorName] = useState("");
@@ -260,6 +269,84 @@ export default function InvoiceDetailScreen() {
       );
     }
   }, [exportSingle, invoiceId, isPreviewMode, t]);
+
+  const openSettingsAction = useCallback(
+    () => ({
+      text: t("tabs.settings"),
+      onPress: () => router.push("/(tabs)/settings"),
+    }),
+    [router, t],
+  );
+
+  const handleOpenPushModal = useCallback(async () => {
+    if (!isConfigured) {
+      Alert.alert(
+        t("invoice.pushToSheetConfigRequiredTitle"),
+        t("invoice.pushToSheetConfigRequiredMessage"),
+        [{ text: t("common.cancel"), style: "cancel" }, openSettingsAction()],
+      );
+      return;
+    }
+
+    const account = await loadStoredAccount();
+    if (!account) {
+      Alert.alert(
+        t("invoice.pushToSheetAuthRequiredTitle"),
+        t("invoice.pushToSheetAuthRequiredMessage"),
+        [{ text: t("common.cancel"), style: "cancel" }, openSettingsAction()],
+      );
+      return;
+    }
+
+    setIsPushModalVisible(true);
+  }, [isConfigured, openSettingsAction, t]);
+
+  const handlePushToSheet = useCallback(
+    async (row: {
+      amount: number | null;
+      date: string | null;
+      name: string | null;
+      payer: string | null;
+    }) => {
+      try {
+        await pushRow(row);
+        setIsPushModalVisible(false);
+        Alert.alert(
+          t("invoice.pushToSheetSuccessTitle"),
+          t("invoice.pushToSheetSuccessMessage"),
+        );
+      } catch (caughtError) {
+        if (caughtError instanceof GoogleAuthRequiredError) {
+          Alert.alert(
+            t("invoice.pushToSheetAuthRequiredTitle"),
+            t("invoice.pushToSheetAuthRequiredMessage"),
+            [{ text: t("common.cancel"), style: "cancel" }, openSettingsAction()],
+          );
+          return;
+        }
+
+        if (
+          caughtError instanceof Error &&
+          caughtError.message.includes("Spreadsheet ID is not configured")
+        ) {
+          Alert.alert(
+            t("invoice.pushToSheetConfigRequiredTitle"),
+            t("invoice.pushToSheetConfigRequiredMessage"),
+            [{ text: t("common.cancel"), style: "cancel" }, openSettingsAction()],
+          );
+          return;
+        }
+
+        Alert.alert(
+          t("invoice.pushToSheetFailedTitle"),
+          caughtError instanceof Error
+            ? caughtError.message
+            : t("invoice.alertSaveFailedMessage"),
+        );
+      }
+    },
+    [openSettingsAction, pushRow, t],
+  );
 
   function handleDelete() {
     Alert.alert(
@@ -459,13 +546,22 @@ export default function InvoiceDetailScreen() {
 
           <View className="flex-row items-center gap-2">
             {isPreviewMode ? null : (
-              <Button
-                disabled={isExporting}
-                label={isExporting ? t("invoice.exporting") : t("invoice.export")}
-                size="sm"
-                variant="secondary"
-                onPress={() => void handleExport()}
-              />
+              <>
+                <Button
+                  disabled={isPushing}
+                  label={t("invoice.pushToSheet")}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => void handleOpenPushModal()}
+                />
+                <Button
+                  disabled={isExporting || isPushing}
+                  label={isExporting ? t("invoice.exporting") : t("invoice.export")}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => void handleExport()}
+                />
+              </>
             )}
             <Image
               source={{ uri: activeHeaderImageUri }}
@@ -918,6 +1014,16 @@ export default function InvoiceDetailScreen() {
           </>
         ) : null}
       </View>
+
+      {invoice ? (
+        <PushToSheetModal
+          initialRow={mapInvoiceToSheetRow(invoice)}
+          isSubmitting={isPushing}
+          visible={isPushModalVisible}
+          onClose={() => setIsPushModalVisible(false)}
+          onSubmit={handlePushToSheet}
+        />
+      ) : null}
     </ThemedView>
   );
 }

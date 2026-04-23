@@ -30,8 +30,17 @@
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.doremon1380.invoicetoexcelexpo"
     },
     "web": {
       "output": "static",
@@ -64,6 +73,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "googleIosClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com",
+      "googleAndroidClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com",
+      "googleWebClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com"
     }
   }
 }

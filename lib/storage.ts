@@ -1,13 +1,17 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-import { EXPORT_HISTORY_STORAGE_KEY } from "@/lib/constants";
+import {
+  EXPORT_HISTORY_STORAGE_KEY,
+  GOOGLE_SHEET_TAB_STORAGE_KEY,
+} from "@/lib/constants";
 import type { ExportHistoryEntry } from "@/lib/types";
 
 const KEYS = {
   THEME_MODE: "theme_mode",
   APP_LOCALE: "app_locale",
   EXPORT_HISTORY: EXPORT_HISTORY_STORAGE_KEY,
+  GOOGLE_SHEET_TAB: GOOGLE_SHEET_TAB_STORAGE_KEY,
 } as const;
 
 export type ThemeMode = "light" | "dark";
@@ -84,5 +88,14 @@ export const Storage = {
       KEYS.EXPORT_HISTORY,
       JSON.stringify(nextHistory),
     );
+  },
+
+  async getGoogleSheetTabName(): Promise<string | null> {
+    const value = await getItem(KEYS.GOOGLE_SHEET_TAB);
+    return value?.trim() || null;
+  },
+
+  async setGoogleSheetTabName(tabName: string): Promise<void> {
+    await setItem(KEYS.GOOGLE_SHEET_TAB, tabName.trim());
   },
 };
