@@ -41,7 +41,7 @@ export function InvoiceFilterBar({
             style={{
               backgroundColor: isActive ? colors.surface : "transparent",
               elevation: isActive ? 2 : 0,
-              shadowColor: "#000000",
+              shadowColor: colors.shadow,
               shadowOffset: { width: 0, height: 1 },
               shadowOpacity: isActive ? 0.06 : 0,
               shadowRadius: 4,

@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 
 import { getAllInvoicesWithData, getInvoiceById, getLineItems } from '@/lib/db';
+import { translate } from "@/lib/i18n";
 import { Storage } from '@/lib/storage';
 import type { ExportHistoryEntry } from '@/lib/types';
 
@@ -10,22 +11,26 @@ export async function exportAllInvoicesToExcel(): Promise<void> {
   const invoices = await getAllInvoicesWithData();
 
   const summaryRows = invoices.map((invoice) => ({
-    'Invoice No.': invoice.invoice_number ?? '—',
-    Vendor: invoice.vendor_name ?? '—',
-    'Invoice Date': invoice.invoice_date ?? '—',
-    Subtotal: 0,
-    Tax: 0,
-    Discount: 0,
-    Total: invoice.total_amount ?? 0,
-    Currency: invoice.currency ?? 'VND',
-    'Scanned At': invoice.scanned_at,
+    [translate("invoice.invoiceNumber")]: invoice.invoice_number ?? '—',
+    [translate("invoice.labelVendor")]: invoice.vendor_name ?? '—',
+    [translate("invoice.labelDate")]: invoice.invoice_date ?? '—',
+    [translate("financial.subtotal")]: 0,
+    [translate("financial.tax")]: 0,
+    [translate("financial.discount")]: 0,
+    [translate("financial.total")]: invoice.total_amount ?? 0,
+    [translate("invoice.currency")]: invoice.currency ?? 'VND',
+    [translate("invoice.scannedAt")]: invoice.scanned_at,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(summaryRows);
   worksheet['!cols'] = Object.keys(summaryRows[0] ?? { empty: true }).map(() => ({ wch: 20 }));
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Invoices');
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    translate("export.sheetAllInvoices"),
+  );
 
   await writeAndShare(workbook, `invoices_export_${dateStamp()}.xlsx`, invoices.length);
 }
@@ -35,31 +40,75 @@ export async function exportSingleInvoiceToExcel(invoiceId: number): Promise<voi
   const items = await getLineItems(invoiceId);
 
   const headerRows = [
-    { Field: 'Invoice No.', Value: invoice.invoice_number ?? '—' },
-    { Field: 'Vendor', Value: invoice.vendor_name ?? '—' },
-    { Field: 'Vendor Address', Value: invoice.vendor_address ?? '—' },
-    { Field: 'Invoice Date', Value: invoice.invoice_date ?? '—' },
-    { Field: 'Due Date', Value: invoice.due_date ?? '—' },
-    { Field: 'Subtotal', Value: invoice.subtotal ?? 0 },
-    { Field: 'Tax', Value: invoice.tax_amount ?? 0 },
-    { Field: 'Discount', Value: invoice.discount_amount ?? 0 },
-    { Field: 'Total', Value: invoice.total_amount ?? 0 },
-    { Field: 'Currency', Value: invoice.currency ?? 'VND' },
-    { Field: 'Payment Method', Value: invoice.payment_method ?? '—' },
-    { Field: 'Notes', Value: invoice.notes ?? '' },
+    {
+      [translate("export.headerField")]: translate("invoice.invoiceNumber"),
+      [translate("export.headerValue")]: invoice.invoice_number ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.labelVendor"),
+      [translate("export.headerValue")]: invoice.vendor_name ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.labelVendorAddress"),
+      [translate("export.headerValue")]: invoice.vendor_address ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.labelDate"),
+      [translate("export.headerValue")]: invoice.invoice_date ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.dueDate"),
+      [translate("export.headerValue")]: invoice.due_date ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("financial.subtotal"),
+      [translate("export.headerValue")]: invoice.subtotal ?? 0,
+    },
+    {
+      [translate("export.headerField")]: translate("financial.tax"),
+      [translate("export.headerValue")]: invoice.tax_amount ?? 0,
+    },
+    {
+      [translate("export.headerField")]: translate("financial.discount"),
+      [translate("export.headerValue")]: invoice.discount_amount ?? 0,
+    },
+    {
+      [translate("export.headerField")]: translate("financial.total"),
+      [translate("export.headerValue")]: invoice.total_amount ?? 0,
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.currency"),
+      [translate("export.headerValue")]: invoice.currency ?? 'VND',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.paymentMethod"),
+      [translate("export.headerValue")]: invoice.payment_method ?? '—',
+    },
+    {
+      [translate("export.headerField")]: translate("invoice.notes"),
+      [translate("export.headerValue")]: invoice.notes ?? '',
+    },
   ];
 
   const lineRows = items.map((item) => ({
-    Description: item.description,
-    Quantity: item.quantity,
-    Unit: item.unit,
-    'Unit Price': item.unit_price,
-    'Total Price': item.total_price,
+    [translate("invoice.lineItemDescription")]: item.description,
+    [translate("invoice.lineItemQuantity")]: item.quantity,
+    [translate("invoice.lineItemUnit")]: item.unit,
+    [translate("invoice.lineItemUnitPrice")]: item.unit_price,
+    [translate("invoice.lineItemTotalPrice")]: item.total_price,
   }));
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(headerRows), 'Invoice');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(lineRows), 'Line Items');
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(headerRows),
+    translate("export.sheetInvoice"),
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(lineRows),
+    translate("export.sheetLineItems"),
+  );
 
   await writeAndShare(workbook, `invoice_${invoice.invoice_number ?? invoiceId}_${dateStamp()}.xlsx`, 1);
 }
@@ -69,7 +118,7 @@ async function writeAndShare(workbook: XLSX.WorkBook, filename: string, recordCo
   const documentDirectory = FileSystem.documentDirectory;
 
   if (!documentDirectory) {
-    throw new Error('Document directory is not available on this device.');
+    throw new Error(translate("export.documentDirectoryUnavailable"));
   }
 
   const fileUri = `${documentDirectory}${filename}`;
@@ -81,12 +130,12 @@ async function writeAndShare(workbook: XLSX.WorkBook, filename: string, recordCo
   const canShare = await Sharing.isAvailableAsync();
 
   if (!canShare) {
-    throw new Error('Sharing is not available on this device.');
+    throw new Error(translate("export.sharingUnavailable"));
   }
 
   await Sharing.shareAsync(fileUri, {
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    dialogTitle: 'Export Invoice',
+    dialogTitle: translate("export.dialogTitle"),
     UTI: 'com.microsoft.excel.xlsx',
   });
 

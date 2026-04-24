@@ -1,22 +1,33 @@
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, View } from "react-native";
-import { useState } from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
 
+import { GoogleSheetPickerModal } from "@/components/settings/GoogleSheetPickerModal";
 import { ThemedText } from "@/components/shared/themed-text";
 import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
-import { FieldInput } from "@/components/shared/ui/FieldInput";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
 import { SectionTitle } from "@/components/shared/ui/SectionTitle";
 import { Colors } from "@/constants/theme";
-import { useGoogleSheetsConfig } from "@/hooks/settings/useGoogleSheetsConfig";
 import { useGoogleAuth } from "@/hooks/settings/useGoogleAuth";
 import { useAppTheme } from "@/hooks/theme/theme-provider";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
-import { verifySpreadsheetAccess } from "@/lib/googleSheets";
+import {
+  getSelectedSpreadsheet,
+  saveSelectedSpreadsheet,
+  type SelectedGoogleSpreadsheet,
+} from "@/lib/googleSheetSelection";
 import { i18n } from "@/lib/i18n";
 import { Storage, type AppLocale } from "@/lib/storage";
+
+type SettingsPalette = (typeof Colors)[keyof typeof Colors];
+type PreferenceOption = {
+  key: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+};
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -24,8 +35,9 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
   const { colorScheme: themeMode, setThemeMode } = useAppTheme();
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [showSpreadsheetId, setShowSpreadsheetId] = useState(false);
+  const [selectedSpreadsheet, setSelectedSpreadsheet] =
+    useState<SelectedGoogleSpreadsheet | null>(null);
+  const [isSheetPickerVisible, setIsSheetPickerVisible] = useState(false);
   const {
     account,
     error: googleAuthError,
@@ -34,156 +46,101 @@ export default function SettingsScreen() {
     signIn,
     signOut,
   } = useGoogleAuth();
-  const {
-    isLoading: isGoogleSheetsLoading,
-    saveSpreadsheetId,
-    saveTabName,
-    spreadsheetId,
-    tabName,
-  } = useGoogleSheetsConfig();
   const activeLocale: AppLocale = i18n.resolvedLanguage
     ?.toLowerCase()
     .startsWith("vi")
     ? "vi"
     : "en";
-  const isGoogleConfigLoading = isGoogleAuthLoading || isGoogleSheetsLoading;
+  const isGoogleConfigLoading = isGoogleAuthLoading;
+
+  const loadSelectedSpreadsheet = useCallback(async () => {
+    setSelectedSpreadsheet(await getSelectedSpreadsheet());
+  }, []);
+
+  useEffect(() => {
+    void loadSelectedSpreadsheet();
+  }, [loadSelectedSpreadsheet]);
 
   async function setLocale(locale: AppLocale) {
     await i18n.changeLanguage(locale);
     await Storage.setAppLocale(locale);
   }
 
-  async function handleTestGoogleConnection() {
-    if (!account) {
+  async function handleSignIn() {
+    const nextAccount = await signIn();
+    if (nextAccount) {
       Alert.alert(
-        t("settings.googleAuthRequiredTitle"),
-        t("settings.googleAuthRequiredMessage"),
+        t("settings.googleSignInSuccessTitle"),
+        t("settings.googleSignInSuccessMessage", {
+          email: nextAccount.email ?? t("settings.googleUnknownEmail"),
+        }),
       );
-      return;
-    }
-
-    if (!spreadsheetId.trim()) {
-      Alert.alert(
-        t("settings.googleSpreadsheetRequiredTitle"),
-        t("settings.googleSpreadsheetRequiredMessage"),
-      );
-      return;
-    }
-
-    setIsTestingConnection(true);
-    try {
-      const result = await verifySpreadsheetAccess({
-        spreadsheetId,
-        tab: tabName,
-      });
-
-      if (!result.tabExists) {
-        Alert.alert(
-          t("settings.googleSheetTabMissingTitle"),
-          t("settings.googleSheetTabMissingMessage", { tabName }),
-        );
-        return;
-      }
-
-      Alert.alert(
-        t("settings.googleConnectionSuccessTitle"),
-        t("settings.googleConnectionSuccessMessage", { title: result.title }),
-      );
-    } catch (caughtError) {
-      Alert.alert(
-        t("settings.googleConnectionFailedTitle"),
-        caughtError instanceof Error
-          ? caughtError.message
-          : t("settings.googleConnectionFailedMessage"),
-      );
-    } finally {
-      setIsTestingConnection(false);
     }
   }
 
+  async function handleSpreadsheetSelected(selection: SelectedGoogleSpreadsheet) {
+    const savedSelection = await saveSelectedSpreadsheet(selection);
+    setSelectedSpreadsheet(savedSelection);
+    setIsSheetPickerVisible(false);
+    Alert.alert(
+      t("settings.googleSheetSelectedTitle"),
+      t("settings.googleSheetSelectedMessage", {
+        name: savedSelection.spreadsheetName,
+      }),
+    );
+  }
+
   return (
-    <ScreenContainer scroll className="mb-5">
+    <ScreenContainer scroll>
       <SectionTitle
         title={t("settings.title")}
         description={t("settings.subtitle")}
       />
 
-      <Card className="mt-4 rounded-[28px] border py-5 px-4">
-        <ThemedText type="defaultSemiBold">
-          {t("settings.appearance")}
-        </ThemedText>
-        <View
-          className="mt-4 flex-row rounded-full border p-1"
-          style={{
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-          }}
-        >
-          {(["light", "dark"] as const).map((mode) => {
-            const isActive = themeMode === mode;
-
-            return (
-              <Pressable
-                key={mode}
-                className="flex-1 rounded-full px-4 py-3"
-                onPress={() => void setThemeMode(mode)}
-                style={{
-                  backgroundColor: isActive ? colors.accent : "transparent",
-                }}
-              >
-                <ThemedText
-                  style={{
-                    color: isActive ? colors.background : colors.muted,
-                    fontWeight: "700",
-                    textAlign: "center",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {mode === "light"
-                    ? t("settings.lightMode")
-                    : t("settings.darkMode")}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
-
-      <Card className="mt-4 rounded-[28px] border py-5 px-4">
-        <ThemedText type="defaultSemiBold">{t("settings.language")}</ThemedText>
-        <View
-          className="mt-4 flex-row rounded-full border p-1"
-          style={{
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-          }}
-        >
-          {(["en", "vi"] as const).map((locale) => {
-            const isActive = activeLocale === locale;
-
-            return (
-              <Pressable
-                key={locale}
-                className="flex-1 rounded-full px-4 py-3"
-                onPress={() => void setLocale(locale)}
-                style={{
-                  backgroundColor: isActive ? colors.accent : "transparent",
-                }}
-              >
-                <ThemedText
-                  style={{
-                    color: isActive ? colors.background : colors.muted,
-                    fontWeight: "700",
-                    textAlign: "center",
-                  }}
-                >
-                  {locale === "en"
-                    ? t("settings.english")
-                    : t("settings.vietnamese")}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
+      <Card className="mt-4 rounded-[28px] border p-4">
+        <View style={styles.preferenceGroup}>
+          <PreferenceRow
+            colors={colors}
+            label={t("settings.appearance")}
+            options={[
+              {
+                key: "light",
+                label: t("settings.lightMode"),
+                active: themeMode === "light",
+                onPress: () => void setThemeMode("light"),
+              },
+              {
+                key: "dark",
+                label: t("settings.darkMode"),
+                active: themeMode === "dark",
+                onPress: () => void setThemeMode("dark"),
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.preferenceDivider,
+              { backgroundColor: colors.divider },
+            ]}
+          />
+          <PreferenceRow
+            colors={colors}
+            label={t("settings.language")}
+            options={[
+              {
+                key: "vi",
+                label: t("settings.vietnamese"),
+                active: activeLocale === "vi",
+                onPress: () => void setLocale("vi"),
+              },
+              {
+                key: "en",
+                label: t("settings.english"),
+                active: activeLocale === "en",
+                onPress: () => void setLocale("en"),
+              },
+            ]}
+          />
         </View>
       </Card>
 
@@ -229,7 +186,7 @@ export default function SettingsScreen() {
               disabled={isGoogleConfigLoading || isSigningIn}
               label={t("settings.googleSignIn")}
               loading={isSigningIn}
-              onPress={() => void signIn()}
+              onPress={() => void handleSignIn()}
             />
           )}
 
@@ -237,36 +194,34 @@ export default function SettingsScreen() {
             <ThemedText style={{ color: colors.danger }}>{googleAuthError}</ThemedText>
           ) : null}
 
-          <FieldInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            label={t("settings.googleSpreadsheetId")}
-            secureTextEntry={!showSpreadsheetId}
-            value={spreadsheetId}
-            onChangeText={(value) => void saveSpreadsheetId(value)}
-            trailing={
-              <Pressable onPress={() => setShowSpreadsheetId((current) => !current)}>
-                <ThemedText style={{ color: colors.accent }}>
-                  {showSpreadsheetId
-                    ? t("settings.googleHideSpreadsheetId")
-                    : t("settings.googleShowSpreadsheetId")}
-                </ThemedText>
-              </Pressable>
-            }
-          />
-          <FieldInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            label={t("settings.googleTabName")}
-            value={tabName}
-            onChangeText={(value) => void saveTabName(value)}
-          />
+          <View
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: colors.border, backgroundColor: colors.background }}
+          >
+            <ThemedText style={{ color: colors.muted }}>
+              {t("settings.googleCurrentSheet")}
+            </ThemedText>
+            <ThemedText className="mt-1" type="defaultSemiBold">
+              {selectedSpreadsheet?.spreadsheetName ??
+                t("settings.googleNoCurrentSheet")}
+            </ThemedText>
+          </View>
+
+          {!account ? (
+            <ThemedText style={{ color: colors.muted }}>
+              {t("settings.googleChooseSheetSignInFirst")}
+            </ThemedText>
+          ) : null}
+
           <Button
-            disabled={isTestingConnection || isGoogleConfigLoading || !account}
-            label={t("settings.googleTestConnection")}
-            loading={isTestingConnection}
+            disabled={isGoogleConfigLoading || !account}
+            label={
+              selectedSpreadsheet
+                ? t("settings.googleChangeSheet")
+                : t("settings.googleChooseOrCreateSheet")
+            }
             variant="secondary"
-            onPress={() => void handleTestGoogleConnection()}
+            onPress={() => setIsSheetPickerVisible(true)}
           />
         </View>
       </Card>
@@ -289,6 +244,99 @@ export default function SettingsScreen() {
           </ThemedText>
         </Pressable>
       </Card>
+
+      <GoogleSheetPickerModal
+        visible={isSheetPickerVisible}
+        onClose={() => setIsSheetPickerVisible(false)}
+        onSelected={(selection) => void handleSpreadsheetSelected(selection)}
+      />
     </ScreenContainer>
   );
 }
+
+function PreferenceRow({
+  colors,
+  label,
+  options,
+}: {
+  colors: SettingsPalette;
+  label: string;
+  options: PreferenceOption[];
+}) {
+  return (
+    <View style={styles.preferenceRow}>
+      <View style={styles.preferenceLabelWrap}>
+        <ThemedText style={styles.preferenceLabel} type="defaultSemiBold">
+          {label}
+        </ThemedText>
+      </View>
+
+      <View
+        style={[
+          styles.preferencePill,
+          {
+            backgroundColor: colors.surfaceAlt,
+          },
+        ]}
+      >
+        {options.map((option) => (
+          <Pressable
+            key={option.key}
+            accessibilityRole="button"
+            accessibilityState={option.active ? { selected: true } : {}}
+            onPress={option.onPress}
+            style={({ pressed }) => [
+              styles.preferenceOption,
+              {
+                backgroundColor: option.active ? colors.accent : "transparent",
+                opacity: pressed ? 0.88 : 1,
+              },
+            ]}
+          >
+            <ThemedText
+              style={{
+                color: option.active ? colors.onAccent : colors.mutedLight,
+                fontWeight: "700",
+                textAlign: "center",
+              }}
+            >
+              {option.label}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  preferenceGroup: {
+    gap: 12,
+  },
+  preferenceRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  preferenceLabelWrap: {
+    flex: 1,
+  },
+  preferenceLabel: {
+    lineHeight: 20,
+  },
+  preferenceDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  preferencePill: {
+    borderRadius: 999,
+    flexDirection: "row",
+    padding: 4,
+  },
+  preferenceOption: {
+    borderRadius: 999,
+    minWidth: 76,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+});

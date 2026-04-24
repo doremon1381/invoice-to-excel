@@ -54,12 +54,13 @@ export interface ScanPreviewData {
 }
 
 export interface ScanResult {
-  invoiceName: string | null;
+  invoiceTitle: string | null;
   imageUri: string;
   imageBase64: string;
   imageMime: 'image/jpeg' | 'image/png' | 'image/webp';
   extracted: ExtractedInvoice;
   rawText: string;
+  scannedAt: string;
   status: InvoiceStatus;
 }
 
@@ -106,7 +107,10 @@ export function useInvoiceScan() {
       setPreviewUri(preparedImage.uri);
 
       //Alert.alert('debug - preparedImage', preparedImage.toString());
-      const { extracted, rawText } = await extractInvoiceData(preparedImage.base64, preparedImage.mimeType);
+      const { extracted, invoiceTitle, rawText } = await extractInvoiceData(
+        preparedImage.base64,
+        preparedImage.mimeType,
+      );
 
       //Alert.alert('debug - extracted', extracted.toString());
       //Alert.alert('debug - rawText', rawText.toString());
@@ -116,12 +120,13 @@ export function useInvoiceScan() {
       setPreviewData(toPreviewData(extracted, rawText, status));
 
       return {
-        invoiceName: null,
+        invoiceTitle,
         imageUri: preparedImage.uri,
         imageBase64: preparedImage.base64,
         imageMime: preparedImage.mimeType,
         extracted,
         rawText: normalizedRawText,
+        scannedAt: new Date().toISOString(),
         status,
       };
     } catch (caughtError) {

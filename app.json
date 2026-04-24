@@ -5,10 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "invoicetoexcelexpo",
+    "scheme": "com.doremon1380.invoicetoexcelexpo",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.doremon1380.invoicetoexcelexpo",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Invoice Scanner to use your camera to scan invoices.",
@@ -18,7 +19,6 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -27,12 +27,6 @@
       "predictiveBackGestureEnabled": false,
       "usesCleartextTraffic": true,
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE",
@@ -53,11 +47,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "resizeMode": "contain"
         }
       ],
       [
@@ -66,18 +56,28 @@
           "cameraPermission": "Allow Invoice Scanner to use your camera to scan invoices."
         }
       ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.435208614905-t4y2et16fe2mmu4f7meabumjues7k2of"
+        }
+      ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-dev-client"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "googleIosClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com",
-      "googleAndroidClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com",
-      "googleWebClientId": "947812351845-vil8lcpn0hcuenkufcvpee6isoquneiv.apps.googleusercontent.com"
+      "googleIosClientId": "435208614905-t4y2et16fe2mmu4f7meabumjues7k2of.apps.googleusercontent.com",
+      "googleWebClientId": "435208614905-1550v87778r39vrb0ncinfdplbqjsm4q.apps.googleusercontent.com",
+      "router": {},
+      "eas": {
+        "projectId": "77c7a5bf-b52b-42fb-b24a-ce1fcf81401b"
+      }
     }
   }
 }

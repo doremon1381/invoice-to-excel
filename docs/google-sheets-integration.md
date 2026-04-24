@@ -1,59 +1,115 @@
 # Google Sheets Integration Setup
 
-This app writes invoice rows directly to Google Sheets using the Sheets REST API v4.
+App dùng Google Sign-In native qua `@react-native-google-signin/google-signin`, lấy `accessToken` khi cần, dùng Google Drive API để liệt kê spreadsheet và Google Sheets API v4 để tạo spreadsheet, tạo tab `Invoices`, ghi header, rồi append hóa đơn.
 
-## 1) Google Cloud setup
+Flow này chỉ hỗ trợ native Android/iOS development build. Bản web cần một OAuth web flow riêng nếu muốn hỗ trợ Google Sheets.
 
-1. Create (or reuse) a Google Cloud project.
-2. Enable **Google Sheets API**.
-3. Configure OAuth consent screen:
-   - User type: External
-   - Publishing status: Testing (fine for personal use)
-   - Add your Google account under Test users
-4. Create OAuth client IDs:
-   - iOS client (bundle identifier)
-   - Android client (package name + SHA-1)
-   - Web client (used by Expo web/dev auth flows)
+## Google Cloud
 
-## 2) App config
+Project hiện tại: `InvoiceExcel`.
 
-In `app.json`, fill these values:
+Cần bật API:
+
+- Google Sheets API
+- Google Drive API
+
+OAuth consent:
+
+- User type: External
+- Publishing status: Testing
+- Test user: `khuongduy250900@gmail.com`
+- Scopes:
+  - `userinfo.email`
+  - `userinfo.profile`
+  - `https://www.googleapis.com/auth/spreadsheets`
+  - `https://www.googleapis.com/auth/drive.metadata.readonly`
+
+OAuth clients:
+
+- Web client: dùng Client ID cho `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
+- Android client: package name phải là `com.doremon1380.invoicetoexcelexpo` và SHA-1 phải khớp keystore đang build app.
+- iOS client: bundle ID phải là `com.doremon1380.invoicetoexcelexpo`.
+- iOS reversed client ID dùng cho `iosUrlScheme`.
+
+Không lưu hoặc dùng Google Client Secret trong app Expo/React Native.
+
+## App Config
+
+`app.json` cần giữ các giá trị native này:
 
 ```json
-"extra": {
-  "googleIosClientId": "YOUR_IOS_CLIENT_ID",
-  "googleAndroidClientId": "YOUR_ANDROID_CLIENT_ID",
-  "googleWebClientId": "YOUR_WEB_CLIENT_ID"
+{
+  "scheme": "com.doremon1380.invoicetoexcelexpo",
+  "android": {
+    "package": "com.doremon1380.invoicetoexcelexpo"
+  },
+  "ios": {
+    "bundleIdentifier": "com.doremon1380.invoicetoexcelexpo"
+  }
 }
 ```
 
-The app already defines the scheme `invoicetoexcelexpo` for OAuth redirects.
+Google Sign-In plugin:
 
-## 3) Spreadsheet values to paste in Settings
+```json
+[
+  "@react-native-google-signin/google-signin",
+  {
+    "iosUrlScheme": "com.googleusercontent.apps.435208614905-t4y2et16fe2mmu4f7meabumjues7k2of"
+  }
+]
+```
 
-Open your Google Sheet URL:
+`.env` và `.env.example`:
 
-`https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit`
+```bash
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=435208614905-1550v87778r39vrb0ncinfdplbqjsm4q.apps.googleusercontent.com
+```
 
-Copy `<SPREADSHEET_ID>` and paste it in:
+`app.json > expo.extra.googleWebClientId` cũng giữ cùng Web Client ID làm fallback cho native build. Đây là public client ID, không phải secret.
 
-- Settings -> Google Sheets -> Spreadsheet ID
-- Tab name (example: `Thu chi mua linh kiện`)
+## Runtime Flow
 
-## 4) Runtime flow
+1. Vào Settings.
+2. Bấm `Đăng nhập Google`.
+3. Bấm `Chọn / tạo Google Sheet`.
+4. Chọn spreadsheet có sẵn hoặc tạo spreadsheet mới.
+5. App đảm bảo tab `Invoices` tồn tại và ghi header `Invoices!A1:K1`.
+6. Vào chi tiết hóa đơn và bấm `Đẩy lên Sheet`.
+7. App lấy token mới nhất bằng `GoogleSignin.getTokens()` và append vào `Invoices!A:K`.
 
-1. In app Settings, tap **Sign in with Google**.
-2. Enter Spreadsheet ID + tab name.
-3. Tap **Test Google connection**.
-4. Open an invoice detail and tap **Push to Sheet**.
+Header cố định:
 
-The app appends one row to range `A:F` with this shape:
+```text
+Ngày, Nhà cung cấp, Số hóa đơn, Tổng tiền, Thuế, Tiền tệ, Phương thức thanh toán, Ghi chú, Số dòng hàng, Dữ liệu dòng hàng JSON, Ngày xuất
+```
 
-- A: Ngày tháng
-- B: (blank)
-- C: (blank)
-- D: Tên hóa đơn
-- E: tiền hóa đơn
-- F: Người thanh toán
+## Development Build
 
-Columns beyond `F` (such as formula columns) are not overwritten.
+Google Sign-In native cần development build:
+
+```bash
+npx expo prebuild --clean
+npx expo run:android
+npx expo start --dev-client
+```
+
+Không test flow Google Sign-In native bằng Expo Go. Bản web hiện chỉ hiển thị thông báo không hỗ trợ; nếu cần web thì phải thêm OAuth web flow riêng.
+
+## Android SHA-1
+
+Nếu Android login lỗi `DEVELOPER_ERROR`, kiểm tra Android OAuth client trong Google Cloud:
+
+- Package name: `com.doremon1380.invoicetoexcelexpo`
+- SHA-1: đúng với keystore dùng build app
+
+Lấy SHA-1:
+
+```powershell
+cd android
+.\gradlew signingReport
+```
+
+Sau đó cập nhật SHA-1 vào Android OAuth client trên Google Cloud Console và rebuild development build.
+
+Nếu báo Google Play Services không có hoặc quá cũ, dùng máy Android có Google Play Store/Google Play Services hoặc emulator Android Studio image loại Google Play.

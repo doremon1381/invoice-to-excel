@@ -67,12 +67,13 @@ export default function ScanScreen() {
       const result = await action();
       if (result) {
         setPendingScan({
-          invoiceName: result.invoiceName,
+          invoiceTitle: result.invoiceTitle,
           extracted: result.extracted,
           imageBase64: result.imageBase64,
           imageMime: result.imageMime,
           imageUri: result.imageUri,
           rawText: result.rawText,
+          scannedAt: result.scannedAt,
           status: result.status,
         });
         clearScanPreview();

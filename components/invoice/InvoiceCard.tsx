@@ -14,6 +14,8 @@ import { ThemedText } from "@/components/shared/themed-text";
 import { Button } from "@/components/shared/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
+import { formatMoney } from "@/lib/formatMoney";
+import { getIntlLocale } from "@/lib/i18n";
 import type { InvoiceListItem } from "@/lib/types";
 
 interface InvoiceCardProps {
@@ -27,12 +29,17 @@ interface InvoiceCardProps {
   enableSwipeToDelete?: boolean;
 }
 
-function formatAmount(totalAmount: number | null, currency: string): string {
+function formatAmount(
+  totalAmount: number | null,
+  currency: string,
+  locale: string,
+): string {
   if (totalAmount === null) {
     return "—";
   }
 
-  return `${totalAmount.toFixed(2)} ${currency}`;
+  const formatted = formatMoney(totalAmount, currency, locale);
+  return `${formatted.value} ${formatted.currency}`;
 }
 
 export function InvoiceCard({
@@ -43,9 +50,10 @@ export function InvoiceCard({
   onRescan,
   enableSwipeToDelete = true,
 }: InvoiceCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const locale = getIntlLocale(i18n.resolvedLanguage ?? i18n.language);
   const swipeableRef = useRef<SwipeableMethods | null>(null);
   const canEdit =
     invoice.status !== "success" && invoice.status !== "error";
@@ -74,7 +82,7 @@ export function InvoiceCard({
       style={{
         backgroundColor: colors.surface,
         borderColor: colors.border,
-        shadowColor: "#000000",
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: colorScheme === "dark" ? 0.2 : 0.06,
         shadowRadius: 8,
@@ -117,7 +125,7 @@ export function InvoiceCard({
               numberOfLines={1}
               className="text-lead font-semibold"
             >
-              {formatAmount(invoice.total_amount, invoice.currency)}
+              {formatAmount(invoice.total_amount, invoice.currency, locale)}
             </ThemedText>
           </View>
 

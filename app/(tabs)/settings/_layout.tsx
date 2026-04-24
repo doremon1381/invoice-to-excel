@@ -6,12 +6,14 @@ import { Typography } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
 export default function SettingsLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const language = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <Stack
+      key={language}
       screenOptions={{
         headerShown: true,
         headerShadowVisible: false,

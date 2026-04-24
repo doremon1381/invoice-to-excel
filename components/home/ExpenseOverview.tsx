@@ -7,7 +7,7 @@ import { Colors } from "@/constants/theme";
 import { Typography } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 import { formatMoney } from "@/lib/formatMoney";
-import { i18n } from "@/lib/i18n";
+import { getIntlLocale } from "@/lib/i18n";
 
 type ExpenseOverviewProps = {
   totalAmount: number;
@@ -15,18 +15,16 @@ type ExpenseOverviewProps = {
   monthDate: Date;
 };
 
-const ON_ACCENT_MUTED = "rgba(255, 255, 255, 0.85)";
-
 export function ExpenseOverview({
   totalAmount,
   currency,
   monthDate,
 }: ExpenseOverviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
-  const locale = i18n.language || "en";
+  const locale = getIntlLocale(i18n.resolvedLanguage ?? i18n.language);
   const { value: formattedValue, currency: currencyCode } = formatMoney(
     totalAmount,
     currency,
@@ -55,7 +53,7 @@ export function ExpenseOverview({
       style={{ backgroundColor: colors.accent }}
     >
       <View className="mb-2 flex-row items-start justify-between">
-        <ThemedText type="overline" style={{ color: ON_ACCENT_MUTED }}>
+        <ThemedText type="overline" style={{ color: colors.onAccentMuted }}>
           {t("home.thisMonth")}
         </ThemedText>
         <View
@@ -70,7 +68,7 @@ export function ExpenseOverview({
         type="custom"
         className="text-md font-semibold"
         style={{
-          color: ON_ACCENT_MUTED,
+          color: colors.onAccentMuted,
           fontSize: Typography.md.size,
           lineHeight: Typography.md.lineHeight,
         }}
@@ -107,7 +105,7 @@ export function ExpenseOverview({
         <ThemedText
           type="custom"
           className="text-caption mt-2"
-          style={{ color: ON_ACCENT_MUTED }}
+          style={{ color: colors.onAccentMuted }}
         >
           {t("home.monthExpenseEmpty")}
         </ThemedText>

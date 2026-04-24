@@ -1,5 +1,5 @@
 import * as Localization from "expo-localization";
-import i18n from "i18next";
+import i18n, { type TOptions } from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import en from "@/locales/en.json";
@@ -28,6 +28,18 @@ export async function hydrateAppLanguage(): Promise<AppLocale> {
   const resolved = stored ?? resolveDeviceLocale();
   await i18n.changeLanguage(resolved);
   return resolved;
+}
+
+export function getIntlLocale(locale?: string): string {
+  const resolved =
+    locale ?? i18n.resolvedLanguage ?? i18n.language ?? resolveDeviceLocale();
+
+  return resolved.toLowerCase().startsWith("vi") ? "vi-VN" : "en-US";
+}
+
+export function translate(key: string, options?: TOptions): string {
+  const translated = i18n.t(key, options);
+  return typeof translated === "string" ? translated : String(translated);
 }
 
 export { i18n };

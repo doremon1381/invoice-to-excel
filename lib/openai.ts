@@ -6,8 +6,9 @@ import {
   OPENAI_EFFORT_LEVEL_MAX,
   OPENAI_MODEL,
 } from "@/lib/constants";
+import { translate } from "@/lib/i18n";
 import { parseExtractedJSON } from "@/lib/parser";
-import type { ExtractedInvoice } from "@/lib/types";
+import type { ExtractInvoiceResponse } from "@/lib/types";
 
 interface OpenAIChatCompletionResponse {
   choices?: {
@@ -71,14 +72,19 @@ async function callChatCompletions(content: unknown): Promise<string> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+    throw new Error(
+      translate("scan.openAiApiError", {
+        status: response.status,
+        details: errorText,
+      }),
+    );
   }
 
   const data = (await response.json()) as OpenAIChatCompletionResponse;
   const text = extractMessageText(data);
 
   if (!text) {
-    throw new Error("OpenAI API returned an empty response.");
+    throw new Error(translate("scan.openAiEmptyResponse"));
   }
 
   return text;
@@ -87,7 +93,7 @@ async function callChatCompletions(content: unknown): Promise<string> {
 export async function extractInvoiceData(
   imageBase64: string,
   mimeType: "image/jpeg" | "image/png" | "image/webp",
-): Promise<{ extracted: ExtractedInvoice; rawText: string }> {
+): Promise<ExtractInvoiceResponse> {
   const text = await callChatCompletions([
     {
       type: "text",
@@ -104,8 +110,11 @@ export async function extractInvoiceData(
 
   console.log("debug - extracted text length", text.length);
 
+  const parsed = parseExtractedJSON(text);
+
   return {
-    extracted: parseExtractedJSON(text),
+    extracted: parsed.extracted,
+    invoiceTitle: parsed.invoiceTitle,
     rawText: text,
   };
 }

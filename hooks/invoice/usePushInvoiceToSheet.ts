@@ -1,57 +1,84 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { useGoogleSheetsConfig } from "@/hooks/settings/useGoogleSheetsConfig";
-import { appendInvoiceRow, type SheetRowPayload } from "@/lib/googleSheets";
+import { getInvoiceById, updateInvoiceSheetSyncStatus } from "@/lib/db";
+import { translate } from "@/lib/i18n";
+import {
+  InvoiceAlreadySyncedError,
+  syncInvoiceToConfiguredSheet,
+} from "@/lib/invoiceSheetSync";
+import {
+  getSelectedSpreadsheet,
+  type SelectedGoogleSpreadsheet,
+} from "@/lib/googleSheetSelection";
+import type { InvoiceDetail } from "@/lib/types";
 
 export function usePushInvoiceToSheet() {
-  const {
-    isLoading: isConfigLoading,
-    loadConfig,
-    spreadsheetId,
-    tabName,
-  } = useGoogleSheetsConfig();
+  const [selectedSpreadsheet, setSelectedSpreadsheet] =
+    useState<SelectedGoogleSpreadsheet | null>(null);
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [isPushing, setIsPushing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pushRow = useCallback(
-    async (row: SheetRowPayload) => {
-      if (!spreadsheetId.trim()) {
-        throw new Error("Google Spreadsheet ID is not configured.");
+  const loadConfig = useCallback(async () => {
+    setIsConfigLoading(true);
+    try {
+      setSelectedSpreadsheet(await getSelectedSpreadsheet());
+    } finally {
+      setIsConfigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadConfig();
+  }, [loadConfig]);
+
+  const pushInvoice = useCallback(async (invoice: InvoiceDetail) => {
+    if (invoice.sheet_sync_status === "synced") {
+      throw new InvoiceAlreadySyncedError();
+    }
+
+    const selection = await getSelectedSpreadsheet();
+    setSelectedSpreadsheet(selection);
+    setIsPushing(true);
+    setError(null);
+
+    try {
+      await syncInvoiceToConfiguredSheet(invoice);
+      await updateInvoiceSheetSyncStatus(invoice.id, {
+        status: "synced",
+        syncedAt: new Date().toISOString(),
+        lastError: null,
+      });
+
+      return await getInvoiceById(invoice.id);
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : translate("invoice.pushToSheetFailedMessage");
+
+      if (!(caughtError instanceof InvoiceAlreadySyncedError)) {
+        await updateInvoiceSheetSyncStatus(invoice.id, {
+          status: "failed",
+          syncedAt: null,
+          lastError: message,
+        });
       }
 
-      setIsPushing(true);
-      setError(null);
-
-      try {
-        await appendInvoiceRow(
-          {
-            spreadsheetId,
-            tab: tabName,
-          },
-          row,
-        );
-      } catch (caughtError) {
-        const message =
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Failed to push row to Google Sheets.";
-        setError(message);
-        throw caughtError;
-      } finally {
-        setIsPushing(false);
-      }
-    },
-    [spreadsheetId, tabName],
-  );
+      setError(message);
+      throw caughtError;
+    } finally {
+      setIsPushing(false);
+    }
+  }, []);
 
   return {
     error,
     isConfigLoading,
-    isConfigured: spreadsheetId.trim().length > 0 && tabName.trim().length > 0,
+    isConfigured: Boolean(selectedSpreadsheet),
     isPushing,
     loadConfig,
-    pushRow,
-    spreadsheetId,
-    tabName,
+    pushInvoice,
+    selectedSpreadsheet,
   };
 }

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { exportAllInvoicesToExcel, exportSingleInvoiceToExcel } from '@/lib/export';
+import { translate } from "@/lib/i18n";
 
 export function useInvoiceExport() {
   const [isExporting, setIsExporting] = useState(false);
@@ -13,7 +14,11 @@ export function useInvoiceExport() {
     try {
       await exportAllInvoicesToExcel();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Failed to export invoices.');
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : translate("database.alertExportFailedMessage"),
+      );
       throw caughtError;
     } finally {
       setIsExporting(false);
@@ -27,7 +32,11 @@ export function useInvoiceExport() {
     try {
       await exportSingleInvoiceToExcel(invoiceId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Failed to export invoice.');
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : translate("invoice.alertExportFailedMessage"),
+      );
       throw caughtError;
     } finally {
       setIsExporting(false);

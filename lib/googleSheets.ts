@@ -1,161 +1,278 @@
-import { GOOGLE_SHEETS_API_BASE } from "@/lib/constants";
 import {
-  getValidAccessToken,
-  GoogleAuthRequiredError,
-} from "@/lib/googleAuth";
+  GOOGLE_INVOICES_SHEET_TAB,
+  GOOGLE_SHEETS_API_BASE,
+} from "@/lib/constants";
+import { translate } from "@/lib/i18n";
+import { formatLineItemsNote } from "@/lib/invoice";
+import { assertGoogleResponseOk, fetchGoogleApi } from "@/lib/googleApi";
 import type { InvoiceDetail } from "@/lib/types";
 
-export type SheetRowPayload = {
-  amount: number | null;
-  date: string | null;
-  name: string | null;
-  payer: string | null;
+export type CreatedGoogleSpreadsheet = {
+  spreadsheetId: string;
+  spreadsheetName: string;
+  spreadsheetUrl?: string;
 };
+
+type SpreadsheetSheet = {
+  properties?: {
+    sheetId?: number;
+    title?: string;
+  };
+};
+
+function getInvoiceSummaryHeaderRow(): string[] {
+  return [
+    translate("invoice.labelDate"),
+    translate("invoice.pushSheetInvoiceName"),
+    translate("invoice.labelTotal"),
+    translate("invoice.labelPayer"),
+  ];
+}
 
 function quoteSheetName(tabName: string): string {
   return `'${tabName.replaceAll("'", "''")}'`;
 }
 
-function normalizeConfig(config: {
-  spreadsheetId: string;
-  tab: string;
-}): { spreadsheetId: string; tab: string } {
-  const spreadsheetId = config.spreadsheetId.trim();
-  const tab = config.tab.trim();
-
-  if (!spreadsheetId) {
-    throw new Error("Google Spreadsheet ID is missing.");
-  }
-
-  if (!tab) {
-    throw new Error("Google Sheet tab name is missing.");
-  }
-
-  return { spreadsheetId, tab };
+function encodeRange(range: string): string {
+  return encodeURIComponent(range);
 }
 
-async function parseGoogleApiError(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as {
-      error?: { message?: string };
-    };
-
-    if (payload.error?.message) {
-      return payload.error.message;
-    }
-  } catch {
-    // Best-effort parsing.
-  }
-
-  return `Google Sheets request failed with status ${response.status}.`;
-}
-
-async function getAuthorizationHeader(forceRefresh = false): Promise<string> {
-  const accessToken = await getValidAccessToken(forceRefresh);
-
-  if (!accessToken) {
-    throw new GoogleAuthRequiredError();
-  }
-
-  return `Bearer ${accessToken}`;
-}
-
-async function performAuthorizedRequest(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-): Promise<Response> {
-  const execute = async (forceRefresh: boolean): Promise<Response> => {
-    const authorization = await getAuthorizationHeader(forceRefresh);
-    return fetch(input, {
-      ...init,
-      headers: {
-        Authorization: authorization,
-        ...init.headers,
-      },
-    });
+function getBearerHeaders(accessToken: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${accessToken}`,
   };
-
-  let response = await execute(false);
-  if (response.status === 401 || response.status === 403) {
-    response = await execute(true);
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new GoogleAuthRequiredError("Google session expired. Please sign in again.");
-  }
-
-  return response;
 }
 
-export async function verifySpreadsheetAccess(config: {
-  spreadsheetId: string;
-  tab: string;
-}): Promise<{ tabExists: boolean; title: string }> {
-  const normalized = normalizeConfig(config);
-  const fields = encodeURIComponent("properties.title,sheets.properties.title");
-  const url = `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
-    normalized.spreadsheetId,
-  )}?fields=${fields}`;
+function getJsonBearerHeaders(accessToken: string): Record<string, string> {
+  return {
+    ...getBearerHeaders(accessToken),
+    "Content-Type": "application/json",
+  };
+}
 
-  const response = await performAuthorizedRequest(url);
+function normalizeCellValue(value: number | string | null | undefined): string | number {
+  return value ?? "";
+}
 
-  if (!response.ok) {
-    throw new Error(await parseGoogleApiError(response));
+function getTitleCellNote(invoice: InvoiceDetail): string {
+  return formatLineItemsNote(invoice.line_items);
+}
+
+function mapInvoiceToSummaryRow(invoice: InvoiceDetail): Array<string | number> {
+  return [
+    normalizeCellValue(invoice.invoice_date),
+    normalizeCellValue(invoice.invoiceTitle),
+    normalizeCellValue(invoice.total_amount),
+    normalizeCellValue(invoice.payer),
+  ];
+}
+
+function toExtendedValue(value: string | number): { numberValue?: number; stringValue?: string } {
+  if (typeof value === "number") {
+    return { numberValue: value };
   }
 
-  const payload = (await response.json()) as {
-    properties?: { title?: string };
-    sheets?: Array<{ properties?: { title?: string } }>;
-  };
+  return { stringValue: value };
+}
 
-  const tabExists = (payload.sheets ?? []).some(
-    (sheet) => sheet.properties?.title === normalized.tab,
-  );
+function buildRowData(invoice: InvoiceDetail): {
+  values: Array<{
+    note?: string;
+    userEnteredValue: { numberValue?: number; stringValue?: string };
+  }>;
+} {
+  const summaryRow = mapInvoiceToSummaryRow(invoice);
+  const titleCellNote = getTitleCellNote(invoice);
 
   return {
-    tabExists,
-    title: payload.properties?.title ?? normalized.spreadsheetId,
+    values: summaryRow.map((value, index) => ({
+      ...(index === 1 && titleCellNote ? { note: titleCellNote } : {}),
+      userEnteredValue: toExtendedValue(value),
+    })),
   };
 }
 
-export async function appendInvoiceRow(
-  config: { spreadsheetId: string; tab: string },
-  row: SheetRowPayload,
-): Promise<void> {
-  const normalized = normalizeConfig(config);
-  const range = `${quoteSheetName(normalized.tab)}!A:F`;
-  const encodedRange = encodeURIComponent(range);
-  const endpoint = `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
-    normalized.spreadsheetId,
-  )}/values/${encodedRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-
-  const values = [
-    row.date ?? "",
-    "",
-    "",
-    row.name ?? "",
-    row.amount ?? "",
-    row.payer ?? "",
-  ];
-
-  const response = await performAuthorizedRequest(endpoint, {
-    body: JSON.stringify({ values: [values] }),
-    headers: {
-      "Content-Type": "application/json",
+async function getSpreadsheetSheets(
+  accessToken: string,
+  spreadsheetId: string,
+): Promise<SpreadsheetSheet[]> {
+  const response = await fetchGoogleApi(
+    `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
+      spreadsheetId,
+    )}?fields=${encodeURIComponent("sheets.properties(sheetId,title)")}`,
+    {
+      headers: getBearerHeaders(accessToken),
     },
+  );
+
+  await assertGoogleResponseOk(response);
+
+  const payload = (await response.json()) as {
+    sheets?: SpreadsheetSheet[];
+  };
+
+  return payload.sheets ?? [];
+}
+
+async function addInvoicesTab(
+  accessToken: string,
+  spreadsheetId: string,
+): Promise<number> {
+  const response = await fetchGoogleApi(
+    `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
+      spreadsheetId,
+    )}:batchUpdate`,
+    {
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: GOOGLE_INVOICES_SHEET_TAB,
+              },
+            },
+          },
+        ],
+      }),
+      headers: getJsonBearerHeaders(accessToken),
+      method: "POST",
+    },
+  );
+
+  await assertGoogleResponseOk(response);
+
+  const payload = (await response.json()) as {
+    replies?: Array<{
+      addSheet?: { properties?: { sheetId?: number } };
+    }>;
+  };
+
+  const sheetId = payload.replies?.[0]?.addSheet?.properties?.sheetId;
+
+  if (typeof sheetId !== "number") {
+    throw new Error(translate("settings.googleApiMissingSheetId"));
+  }
+
+  return sheetId;
+}
+
+export async function createGoogleSpreadsheet(
+  accessToken: string,
+  title: string,
+): Promise<CreatedGoogleSpreadsheet> {
+  const resolvedTitle =
+    title.trim() || translate("settings.googleDefaultSpreadsheetTitle");
+  const response = await fetchGoogleApi(GOOGLE_SHEETS_API_BASE, {
+    body: JSON.stringify({
+      properties: {
+        title: resolvedTitle,
+      },
+      sheets: [
+        {
+          properties: {
+            title: GOOGLE_INVOICES_SHEET_TAB,
+          },
+        },
+      ],
+    }),
+    headers: getJsonBearerHeaders(accessToken),
     method: "POST",
   });
 
-  if (!response.ok) {
-    throw new Error(await parseGoogleApiError(response));
+  await assertGoogleResponseOk(response);
+
+  const payload = (await response.json()) as {
+    properties?: { title?: string };
+    spreadsheetId?: string;
+    spreadsheetUrl?: string;
+  };
+
+  if (!payload.spreadsheetId) {
+    throw new Error(translate("settings.googleApiMissingSpreadsheetId"));
   }
+
+  return {
+    spreadsheetId: payload.spreadsheetId,
+    spreadsheetName: payload.properties?.title ?? resolvedTitle,
+    spreadsheetUrl: payload.spreadsheetUrl,
+  };
 }
 
-export function mapInvoiceToSheetRow(invoice: InvoiceDetail): SheetRowPayload {
-  return {
-    amount: invoice.total_amount,
-    date: invoice.invoice_date,
-    name: invoice.vendor_name ?? invoice.invoice_number,
-    payer: null,
-  };
+export async function writeInvoiceHeader(
+  accessToken: string,
+  spreadsheetId: string,
+): Promise<void> {
+  const range = `${quoteSheetName(GOOGLE_INVOICES_SHEET_TAB)}!A1:D1`;
+  const response = await fetchGoogleApi(
+    `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
+      spreadsheetId,
+    )}/values/${encodeRange(range)}?valueInputOption=USER_ENTERED`,
+    {
+      body: JSON.stringify({ values: [getInvoiceSummaryHeaderRow()] }),
+      headers: getJsonBearerHeaders(accessToken),
+      method: "PUT",
+    },
+  );
+
+  await assertGoogleResponseOk(response);
+}
+
+export async function getSpreadsheetTabs(
+  accessToken: string,
+  spreadsheetId: string,
+): Promise<string[]> {
+  const sheets = await getSpreadsheetSheets(accessToken, spreadsheetId);
+
+  return sheets
+    .map((sheet) => sheet.properties?.title)
+    .filter((title): title is string => typeof title === "string");
+}
+
+export async function ensureInvoicesTab(
+  accessToken: string,
+  spreadsheetId: string,
+): Promise<number> {
+  const sheets = await getSpreadsheetSheets(accessToken, spreadsheetId);
+  const existingSheet = sheets.find(
+    (sheet) => sheet.properties?.title === GOOGLE_INVOICES_SHEET_TAB,
+  );
+
+  const sheetId =
+    typeof existingSheet?.properties?.sheetId === "number"
+      ? existingSheet.properties.sheetId
+      : await addInvoicesTab(accessToken, spreadsheetId);
+
+  await writeInvoiceHeader(accessToken, spreadsheetId);
+
+  return sheetId;
+}
+
+export async function syncInvoiceSummaryToSpreadsheet(
+  accessToken: string,
+  spreadsheetId: string,
+  invoice: InvoiceDetail,
+): Promise<void> {
+  const sheetId = await ensureInvoicesTab(accessToken, spreadsheetId);
+  const response = await fetchGoogleApi(
+    `${GOOGLE_SHEETS_API_BASE}/${encodeURIComponent(
+      spreadsheetId,
+    )}:batchUpdate`,
+    {
+      body: JSON.stringify({
+        requests: [
+          {
+            appendCells: {
+              fields: "userEnteredValue,note",
+              rows: [buildRowData(invoice)],
+              sheetId,
+            },
+          },
+        ],
+      }),
+      headers: getJsonBearerHeaders(accessToken),
+      method: "POST",
+    },
+  );
+
+  await assertGoogleResponseOk(response);
 }

@@ -1,6 +1,9 @@
 import * as SQLite from "expo-sqlite";
+import { Platform } from "react-native";
 
 import { DEFAULT_CURRENCY } from "@/lib/constants";
+import { translate } from "@/lib/i18n";
+import { normalizePaymentMethod } from "@/lib/invoice";
 import type {
   ExtractedInvoice,
   InvoiceDetail,
@@ -9,9 +12,8 @@ import type {
   InvoiceStatus,
   LineItem,
   SaveInvoiceInput,
+  SheetSyncStatus,
 } from "@/lib/types";
-
-import { Platform } from "react-native";
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let initializedPromise: Promise<void> | null = null;
@@ -31,6 +33,91 @@ async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   return databasePromise;
 }
 
+function toNullableString(value: SQLite.SQLiteBindValue): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function toNullableNumber(value: SQLite.SQLiteBindValue): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function normalizeSheetSyncStatus(value: SQLite.SQLiteBindValue): SheetSyncStatus {
+  return value === "synced" || value === "failed" ? value : "not_synced";
+}
+
+function mapInvoiceBase(row: Record<string, SQLite.SQLiteBindValue>): InvoiceRow {
+  return {
+    id: Number(row.id),
+    invoiceTitle: toNullableString(row.invoice_name),
+    image_uri: String(row.image_uri),
+    image_base64: toNullableString(row.image_base64),
+    image_mime: toNullableString(row.image_mime),
+    raw_text: toNullableString(row.raw_text),
+    scanned_at: String(row.scanned_at),
+    status: String(row.status) as InvoiceStatus,
+    sheet_sync_status: normalizeSheetSyncStatus(row.sheet_sync_status),
+    sheet_synced_at: toNullableString(row.sheet_synced_at),
+    sheet_last_error: toNullableString(row.sheet_last_error),
+  };
+}
+
+function mapInvoiceListItem(
+  row: Record<string, SQLite.SQLiteBindValue>,
+): InvoiceListItem {
+  return {
+    ...mapInvoiceBase(row),
+    vendor_name: toNullableString(row.vendor_name),
+    invoice_number: toNullableString(row.invoice_number),
+    invoice_date: toNullableString(row.invoice_date),
+    total_amount: toNullableNumber(row.total_amount),
+    currency: toNullableString(row.currency) ?? DEFAULT_CURRENCY,
+  };
+}
+
+function mapLineItem(row: Record<string, SQLite.SQLiteBindValue>): LineItem {
+  return {
+    id: Number(row.id),
+    invoice_id: Number(row.invoice_id),
+    description: toNullableString(row.description) ?? "",
+    quantity: toNullableNumber(row.quantity),
+    unit: toNullableString(row.unit),
+    unit_price: toNullableNumber(row.unit_price),
+    total_price: toNullableNumber(row.total_price),
+  };
+}
+
+async function ensureColumn(
+  database: SQLite.SQLiteDatabase,
+  tableName: string,
+  columnName: string,
+  columnSql: string,
+): Promise<void> {
+  const tableInfo = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
+    `PRAGMA table_info(${tableName});`,
+  );
+  const columns = new Set(tableInfo.map((column) => String(column.name)));
+
+  if (!columns.has(columnName)) {
+    await database.execAsync(
+      `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnSql};`,
+    );
+  }
+}
+
 async function runSchemaMigrations(
   database: SQLite.SQLiteDatabase,
 ): Promise<void> {
@@ -45,7 +132,10 @@ async function runSchemaMigrations(
       image_mime TEXT,
       raw_text TEXT,
       scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      status TEXT DEFAULT 'pending'
+      status TEXT DEFAULT 'pending',
+      sheet_sync_status TEXT DEFAULT 'not_synced',
+      sheet_synced_at DATETIME,
+      sheet_last_error TEXT
     );
 
     CREATE TABLE IF NOT EXISTS invoice_data (
@@ -83,56 +173,36 @@ async function runSchemaMigrations(
   const userVersion = versionRow?.user_version ?? 0;
 
   if (userVersion < 1) {
-    const tableInfo = await database.getAllAsync<
-      Record<string, SQLite.SQLiteBindValue>
-    >("PRAGMA table_info(invoices);");
-    const invoiceColumns = new Set(
-      tableInfo.map((column) => String(column.name)),
-    );
-
-    if (!invoiceColumns.has("image_base64")) {
-      await database.execAsync(
-        "ALTER TABLE invoices ADD COLUMN image_base64 TEXT;",
-      );
-    }
-
-    if (!invoiceColumns.has("image_mime")) {
-      await database.execAsync("ALTER TABLE invoices ADD COLUMN image_mime TEXT;");
-    }
-
+    await ensureColumn(database, "invoices", "image_base64", "TEXT");
+    await ensureColumn(database, "invoices", "image_mime", "TEXT");
     await database.execAsync("PRAGMA user_version = 1;");
   }
 
   if (userVersion < 2) {
-    const tableInfo = await database.getAllAsync<
-      Record<string, SQLite.SQLiteBindValue>
-    >("PRAGMA table_info(invoice_data);");
-    const invoiceDataColumns = new Set(
-      tableInfo.map((column) => String(column.name)),
-    );
-
-    if (!invoiceDataColumns.has("payer")) {
-      await database.execAsync("ALTER TABLE invoice_data ADD COLUMN payer TEXT;");
-    }
-
+    await ensureColumn(database, "invoice_data", "payer", "TEXT");
     await database.execAsync("PRAGMA user_version = 2;");
   }
 
   if (userVersion < 3) {
-    const tableInfo = await database.getAllAsync<
-      Record<string, SQLite.SQLiteBindValue>
-    >("PRAGMA table_info(invoices);");
-    const invoiceColumns = new Set(
-      tableInfo.map((column) => String(column.name)),
-    );
-
-    if (!invoiceColumns.has("invoice_name")) {
-      await database.execAsync(
-        "ALTER TABLE invoices ADD COLUMN invoice_name TEXT;",
-      );
-    }
-
+    await ensureColumn(database, "invoices", "invoice_name", "TEXT");
     await database.execAsync("PRAGMA user_version = 3;");
+  }
+
+  if (userVersion < 4) {
+    await ensureColumn(
+      database,
+      "invoices",
+      "sheet_sync_status",
+      "TEXT DEFAULT 'not_synced'",
+    );
+    await ensureColumn(database, "invoices", "sheet_synced_at", "DATETIME");
+    await ensureColumn(database, "invoices", "sheet_last_error", "TEXT");
+    await database.execAsync(`
+      UPDATE invoices
+      SET sheet_sync_status = COALESCE(sheet_sync_status, 'not_synced')
+      WHERE sheet_sync_status IS NULL;
+      PRAGMA user_version = 4;
+    `);
   }
 }
 
@@ -154,83 +224,48 @@ async function getReadyDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   return database;
 }
 
-function mapInvoiceListItem(
-  row: Record<string, SQLite.SQLiteBindValue>,
-): InvoiceListItem {
-  return {
-    id: Number(row.id),
-    invoice_name: row.invoice_name ? String(row.invoice_name) : null,
-    image_uri: String(row.image_uri),
-    raw_text: row.raw_text ? String(row.raw_text) : null,
-    scanned_at: String(row.scanned_at),
-    status: String(row.status) as InvoiceListItem["status"],
-    image_base64: null,
-    image_mime: null,
-    vendor_name: row.vendor_name ? String(row.vendor_name) : null,
-    invoice_number: row.invoice_number ? String(row.invoice_number) : null,
-    invoice_date: row.invoice_date ? String(row.invoice_date) : null,
-    total_amount:
-      typeof row.total_amount === "number"
-        ? row.total_amount
-        : row.total_amount
-          ? Number(row.total_amount)
-          : null,
-    currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
-  };
-}
-
-function mapLineItem(row: Record<string, SQLite.SQLiteBindValue>): LineItem {
-  return {
-    id: Number(row.id),
-    invoice_id: Number(row.invoice_id),
-    description: row.description ? String(row.description) : "",
-    quantity:
-      typeof row.quantity === "number"
-        ? row.quantity
-        : row.quantity
-          ? Number(row.quantity)
-          : null,
-    unit: row.unit ? String(row.unit) : null,
-    unit_price:
-      typeof row.unit_price === "number"
-        ? row.unit_price
-        : row.unit_price
-          ? Number(row.unit_price)
-          : null,
-    total_price:
-      typeof row.total_price === "number"
-        ? row.total_price
-        : row.total_price
-          ? Number(row.total_price)
-          : null,
-  };
-}
-
-export async function initializeDatabase(): Promise<void> {
-  await getReadyDatabase();
-}
-
-export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
-  const database = await getReadyDatabase();
-
-  if (!database) {
-    throw new Error("SQLite is not available on this platform.");
-  }
-
-  const createdInvoice = await database.runAsync(
-    "INSERT INTO invoices (invoice_name, image_uri, image_base64, image_mime, raw_text, status) VALUES (?, ?, ?, ?, ?, ?)",
+async function upsertInvoiceData(
+  database: SQLite.SQLiteDatabase,
+  invoiceId: number,
+  extracted: ExtractedInvoice,
+): Promise<void> {
+  const updateResult = await database.runAsync(
+    `UPDATE invoice_data SET
+      vendor_name = ?,
+      vendor_address = ?,
+      invoice_number = ?,
+      invoice_date = ?,
+      due_date = ?,
+      subtotal = ?,
+      tax_amount = ?,
+      discount_amount = ?,
+      total_amount = ?,
+      currency = ?,
+      payer = ?,
+      payment_method = ?,
+      notes = ?
+    WHERE invoice_id = ?`,
     [
-      input.invoiceName,
-      input.imageUri,
-      input.imageBase64 ?? null,
-      input.imageMime ?? null,
-      input.rawText,
-      input.status,
+      extracted.vendor_name,
+      extracted.vendor_address,
+      extracted.invoice_number,
+      extracted.invoice_date,
+      extracted.due_date,
+      extracted.subtotal,
+      extracted.tax_amount,
+      extracted.discount_amount,
+      extracted.total_amount,
+      extracted.currency,
+      extracted.payer,
+      normalizePaymentMethod(extracted.payment_method),
+      extracted.notes,
+      invoiceId,
     ],
   );
 
-  const invoiceId = Number(createdInvoice?.lastInsertRowId);
-  const extracted = input.extracted;
+  if ((updateResult.changes ?? 0) > 0) {
+    return;
+  }
 
   await database.runAsync(
     `INSERT INTO invoice_data (
@@ -262,17 +297,27 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
       extracted.total_amount,
       extracted.currency,
       extracted.payer,
-      extracted.payment_method,
+      normalizePaymentMethod(extracted.payment_method),
       extracted.notes,
     ],
   );
+}
 
-  for (const item of extracted.line_items) {
+async function replaceLineItems(
+  database: SQLite.SQLiteDatabase,
+  invoiceId: number,
+  lineItems: LineItem[],
+): Promise<void> {
+  await database.runAsync("DELETE FROM line_items WHERE invoice_id = ?", [
+    invoiceId,
+  ]);
+
+  for (const item of lineItems) {
     await database.runAsync(
       "INSERT INTO line_items (invoice_id, description, quantity, unit_price, unit, total_price) VALUES (?, ?, ?, ?, ?, ?)",
       [
         invoiceId,
-        item.description,
+        item.description.trim(),
         item.quantity,
         item.unit_price,
         item.unit,
@@ -280,6 +325,49 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
       ],
     );
   }
+}
+
+export async function initializeDatabase(): Promise<void> {
+  await getReadyDatabase();
+}
+
+export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
+  const database = await getReadyDatabase();
+
+  if (!database) {
+    throw new Error(translate("common.sqliteUnavailable"));
+  }
+
+  const createdInvoice = await database.runAsync(
+    `INSERT INTO invoices (
+      invoice_name,
+      image_uri,
+      image_base64,
+      image_mime,
+      raw_text,
+      scanned_at,
+      status,
+      sheet_sync_status,
+      sheet_synced_at,
+      sheet_last_error
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.invoiceTitle,
+      input.imageUri,
+      input.imageBase64 ?? null,
+      input.imageMime ?? null,
+      input.rawText,
+      input.scannedAt,
+      input.status,
+      "not_synced",
+      null,
+      null,
+    ],
+  );
+
+  const invoiceId = Number(createdInvoice?.lastInsertRowId);
+  await upsertInvoiceData(database, invoiceId, input.extracted);
+  await replaceLineItems(database, invoiceId, input.extracted.line_items);
 
   return invoiceId;
 }
@@ -287,7 +375,7 @@ export async function saveInvoice(input: SaveInvoiceInput): Promise<number> {
 export async function updateInvoice(
   invoiceId: number,
   patch: {
-    invoiceName?: string | null;
+    invoiceTitle?: string | null;
     extracted: ExtractedInvoice;
     rawText?: string | null;
     status?: InvoiceStatus;
@@ -313,45 +401,39 @@ export async function updateInvoice(
     ]);
   }
 
-  if (patch.invoiceName !== undefined) {
+  if (patch.invoiceTitle !== undefined) {
     await database.runAsync(
       "UPDATE invoices SET invoice_name = ? WHERE id = ?",
-      [patch.invoiceName, invoiceId],
+      [patch.invoiceTitle, invoiceId],
     );
   }
 
-  const extracted = patch.extracted;
+  await upsertInvoiceData(database, invoiceId, patch.extracted);
+  await replaceLineItems(database, invoiceId, patch.extracted.line_items);
+}
+
+export async function updateInvoiceSheetSyncStatus(
+  invoiceId: number,
+  patch: {
+    status: SheetSyncStatus;
+    syncedAt?: string | null;
+    lastError?: string | null;
+  },
+): Promise<void> {
+  const database = await getReadyDatabase();
+
+  if (!database) {
+    return;
+  }
 
   await database.runAsync(
-    `UPDATE invoice_data SET
-      vendor_name = ?,
-      vendor_address = ?,
-      invoice_number = ?,
-      invoice_date = ?,
-      due_date = ?,
-      subtotal = ?,
-      tax_amount = ?,
-      discount_amount = ?,
-      total_amount = ?,
-      currency = ?,
-      payer = ?,
-      payment_method = ?,
-      notes = ?
-    WHERE invoice_id = ?`,
+    `UPDATE invoices
+    SET sheet_sync_status = ?, sheet_synced_at = ?, sheet_last_error = ?
+    WHERE id = ?`,
     [
-      extracted.vendor_name,
-      extracted.vendor_address,
-      extracted.invoice_number,
-      extracted.invoice_date,
-      extracted.due_date,
-      extracted.subtotal,
-      extracted.tax_amount,
-      extracted.discount_amount,
-      extracted.total_amount,
-      extracted.currency,
-      extracted.payer,
-      extracted.payment_method,
-      extracted.notes,
+      patch.status,
+      patch.syncedAt ?? null,
+      patch.lastError ?? null,
       invoiceId,
     ],
   );
@@ -364,16 +446,20 @@ export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
     return [];
   }
 
-  const rows = await database.getAllAsync<
-    Record<string, SQLite.SQLiteBindValue>
-  >(`
+  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
+    `
     SELECT
       invoices.id,
       invoices.invoice_name,
       invoices.image_uri,
+      invoices.image_base64,
+      invoices.image_mime,
       invoices.raw_text,
       invoices.scanned_at,
       invoices.status,
+      invoices.sheet_sync_status,
+      invoices.sheet_synced_at,
+      invoices.sheet_last_error,
       invoice_data.vendor_name,
       invoice_data.invoice_number,
       invoice_data.invoice_date,
@@ -382,7 +468,8 @@ export async function getAllInvoicesWithData(): Promise<InvoiceListItem[]> {
     FROM invoices
     LEFT JOIN invoice_data ON invoice_data.invoice_id = invoices.id
     ORDER BY invoices.scanned_at DESC
-  `);
+  `,
+  );
 
   return rows?.map(mapInvoiceListItem) ?? [];
 }
@@ -393,12 +480,10 @@ export async function getInvoiceById(
   const database = await getReadyDatabase();
 
   if (!database) {
-    throw new Error("SQLite is not available on this platform.");
+    throw new Error(translate("common.sqliteUnavailable"));
   }
 
-  const row = await database.getFirstAsync<
-    Record<string, SQLite.SQLiteBindValue>
-  >(
+  const row = await database.getFirstAsync<Record<string, SQLite.SQLiteBindValue>>(
     `SELECT
       invoices.id,
       invoices.invoice_name,
@@ -408,6 +493,9 @@ export async function getInvoiceById(
       invoices.raw_text,
       invoices.scanned_at,
       invoices.status,
+      invoices.sheet_sync_status,
+      invoices.sheet_synced_at,
+      invoices.sheet_last_error,
       invoice_data.vendor_name,
       invoice_data.vendor_address,
       invoice_data.invoice_number,
@@ -429,53 +517,26 @@ export async function getInvoiceById(
   );
 
   if (!row) {
-    throw new Error("Invoice not found.");
+    throw new Error(translate("invoice.notFound"));
   }
 
   const lineItems = await getLineItems(invoiceId);
 
   return {
-    id: Number(row.id),
-    invoice_name: row.invoice_name ? String(row.invoice_name) : null,
-    image_uri: String(row.image_uri),
-    image_base64: row.image_base64 ? String(row.image_base64) : null,
-    image_mime: row.image_mime ? String(row.image_mime) : null,
-    raw_text: row.raw_text ? String(row.raw_text) : null,
-    scanned_at: String(row.scanned_at),
-    status: String(row.status) as InvoiceRow["status"],
-    vendor_name: row.vendor_name ? String(row.vendor_name) : null,
-    vendor_address: row.vendor_address ? String(row.vendor_address) : null,
-    invoice_number: row.invoice_number ? String(row.invoice_number) : null,
-    invoice_date: row.invoice_date ? String(row.invoice_date) : null,
-    due_date: row.due_date ? String(row.due_date) : null,
-    subtotal:
-      typeof row.subtotal === "number"
-        ? row.subtotal
-        : row.subtotal
-          ? Number(row.subtotal)
-          : null,
-    tax_amount:
-      typeof row.tax_amount === "number"
-        ? row.tax_amount
-        : row.tax_amount
-          ? Number(row.tax_amount)
-          : null,
-    discount_amount:
-      typeof row.discount_amount === "number"
-        ? row.discount_amount
-        : row.discount_amount
-          ? Number(row.discount_amount)
-          : null,
-    total_amount:
-      typeof row.total_amount === "number"
-        ? row.total_amount
-        : row.total_amount
-          ? Number(row.total_amount)
-          : null,
-    currency: row.currency ? String(row.currency) : DEFAULT_CURRENCY,
-    payer: row.payer ? String(row.payer) : null,
-    payment_method: row.payment_method ? String(row.payment_method) : null,
-    notes: row.notes ? String(row.notes) : null,
+    ...mapInvoiceBase(row),
+    vendor_name: toNullableString(row.vendor_name),
+    vendor_address: toNullableString(row.vendor_address),
+    invoice_number: toNullableString(row.invoice_number),
+    invoice_date: toNullableString(row.invoice_date),
+    due_date: toNullableString(row.due_date),
+    subtotal: toNullableNumber(row.subtotal),
+    tax_amount: toNullableNumber(row.tax_amount),
+    discount_amount: toNullableNumber(row.discount_amount),
+    total_amount: toNullableNumber(row.total_amount),
+    currency: toNullableString(row.currency) ?? DEFAULT_CURRENCY,
+    payer: toNullableString(row.payer),
+    payment_method: normalizePaymentMethod(row.payment_method),
+    notes: toNullableString(row.notes),
     line_items: lineItems,
   };
 }
@@ -487,9 +548,7 @@ export async function getLineItems(invoiceId: number): Promise<LineItem[]> {
     return [];
   }
 
-  const rows = await database.getAllAsync<
-    Record<string, SQLite.SQLiteBindValue>
-  >(
+  const rows = await database.getAllAsync<Record<string, SQLite.SQLiteBindValue>>(
     "SELECT id, invoice_id, description, quantity, unit_price, unit, total_price FROM line_items WHERE invoice_id = ? ORDER BY id ASC",
     [invoiceId],
   );
@@ -535,7 +594,7 @@ export async function getInvoiceCount(): Promise<number> {
   return result?.count ?? 0;
 }
 
-export function createPendingInvoice(imageUri: string): ExtractedInvoice {
+export function createPendingInvoice(): ExtractedInvoice {
   return {
     vendor_name: null,
     vendor_address: null,

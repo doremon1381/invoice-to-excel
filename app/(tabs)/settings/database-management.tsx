@@ -15,13 +15,15 @@ import { Colors } from "@/constants/theme";
 import { useInvoiceExport } from "@/hooks/invoice/useInvoiceExport";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 import { deleteNonFinalInvoices, getInvoiceCount } from "@/lib/db";
+import { getIntlLocale } from "@/lib/i18n";
 import { Storage } from "@/lib/storage";
 import type { ExportHistoryEntry } from "@/lib/types";
 
 export default function DatabaseManagementScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const locale = getIntlLocale(i18n.resolvedLanguage ?? i18n.language);
   const { exportAll, isExporting } = useInvoiceExport();
   const [recordCount, setRecordCount] = useState(0);
   const [history, setHistory] = useState<ExportHistoryEntry[]>([]);
@@ -61,6 +63,21 @@ export default function DatabaseManagementScreen() {
     [recordCount],
   );
   const recentExports = useMemo(() => history.slice(0, 4), [history]);
+  const shortDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "short",
+      }),
+    [locale],
+  );
+  const shortDateTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "short",
+        timeStyle: "short",
+      }),
+    [locale],
+  );
 
   async function handleExport() {
     try {
@@ -227,7 +244,7 @@ export default function DatabaseManagementScreen() {
                 }}
               >
                 <ThemedText className="text-caption" style={{ flex: 1 }}>
-                  {entry.created_at.slice(0, 10)}
+                  {shortDateFormatter.format(new Date(entry.created_at))}
                 </ThemedText>
                 <ThemedText className="text-caption" style={{ width: 56 }}>
                   {entry.file_type}
@@ -279,7 +296,7 @@ export default function DatabaseManagementScreen() {
                   <ThemedText className="text-caption" style={{ color: colors.muted }}>
                     {entry.record_count} {t("common.records")}{" "}
                     {t("common.separatorMiddleDot")}{" "}
-                    {entry.created_at.slice(0, 16).replace("T", " ")}
+                    {shortDateTimeFormatter.format(new Date(entry.created_at))}
                   </ThemedText>
                 </View>
               </View>

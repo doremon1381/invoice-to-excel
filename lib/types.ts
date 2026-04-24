@@ -1,4 +1,8 @@
-export type InvoiceStatus = 'pending' | 'success' | 'error';
+export type InvoiceStatus = "pending" | "success" | "error";
+
+export type PaymentMethod = "bank_transfer" | "cash" | null;
+
+export type SheetSyncStatus = "not_synced" | "synced" | "failed";
 
 export interface LineItem {
   id?: number;
@@ -22,20 +26,23 @@ export interface ExtractedInvoice {
   total_amount: number | null;
   currency: string;
   payer: string | null;
-  payment_method: string | null;
+  payment_method: PaymentMethod;
   notes: string | null;
   line_items: LineItem[];
 }
 
 export interface InvoiceRow {
   id: number;
-  invoice_name: string | null;
+  invoiceTitle: string | null;
   image_uri: string;
   image_base64: string | null;
   image_mime: string | null;
   raw_text: string | null;
   scanned_at: string;
   status: InvoiceStatus;
+  sheet_sync_status: SheetSyncStatus;
+  sheet_synced_at: string | null;
+  sheet_last_error: string | null;
 }
 
 export interface InvoiceDataRow {
@@ -52,7 +59,7 @@ export interface InvoiceDataRow {
   total_amount: number | null;
   currency: string;
   payer: string | null;
-  payment_method: string | null;
+  payment_method: PaymentMethod;
   notes: string | null;
 }
 
@@ -69,19 +76,26 @@ export interface InvoiceDetail extends InvoiceRow, ExtractedInvoice {
 }
 
 export interface SaveInvoiceInput {
-  invoiceName: string;
+  invoiceTitle: string | null;
   imageUri: string;
   imageBase64?: string | null;
   imageMime?: string | null;
   rawText: string;
+  scannedAt: string;
   status: InvoiceStatus;
   extracted: ExtractedInvoice;
+}
+
+export interface ExtractInvoiceResponse {
+  extracted: ExtractedInvoice;
+  invoiceTitle: string | null;
+  rawText: string;
 }
 
 export interface ExportHistoryEntry {
   id: string;
   created_at: string;
-  file_type: 'xlsx';
+  file_type: "xlsx";
   record_count: number;
-  status: 'success' | 'error';
+  status: "success" | "error";
 }

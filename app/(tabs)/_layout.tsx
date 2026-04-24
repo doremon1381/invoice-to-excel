@@ -1,5 +1,8 @@
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/shared/ui/icon-symbol";
@@ -8,12 +11,15 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
 export default function TabLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const language = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <Tabs
+      key={language}
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: true,
         headerShadowVisible: false,
@@ -28,18 +34,6 @@ export default function TabLayout() {
         headerTintColor: colors.foreground,
         sceneStyle: {
           backgroundColor: colors.background,
-        },
-        tabBarButton: HapticTab,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.mutedLight,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          minHeight: 56,
-          paddingTop: 8,
-          paddingBottom: 8,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          backgroundColor: colors.surface,
         },
       }}
     >
@@ -89,3 +83,128 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = Colors[colorScheme];
+
+  return (
+    <View
+      style={[
+        styles.tabBar,
+        {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          paddingBottom: Math.max(insets.bottom, 12),
+        },
+      ]}
+    >
+      <View style={styles.tabBarRow}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({
+              type: "tabLongPress",
+              target: route.key,
+            });
+          };
+
+          const label =
+            typeof options.tabBarLabel === "string"
+              ? options.tabBarLabel
+              : typeof options.title === "string"
+                ? options.title
+                : route.name;
+          const color = isFocused ? colors.accent : colors.mutedLight;
+          const icon = options.tabBarIcon?.({ focused: isFocused, color, size: 22 });
+
+          return (
+            <HapticTab
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarButtonTestID}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={styles.tabItem}
+            >
+              <View
+                style={[
+                  styles.iconContainer,
+                  isFocused && {
+                    backgroundColor: colors.accentSoft,
+                    borderColor: colors.accentBorder,
+                  },
+                  isFocused && styles.iconContainerActive,
+                ]}
+              >
+                {icon}
+              </View>
+              <Text
+                style={[
+                  styles.label,
+                  {
+                    color,
+                    fontSize: Typography.xs.size,
+                    lineHeight: Typography.xs.lineHeight,
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+            </HapticTab>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  tabBarRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-around",
+    minHeight: 64,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconContainerActive: {
+    borderWidth: 1,
+  },
+  label: {
+    marginTop: 2,
+    fontWeight: "600",
+  },
+});
