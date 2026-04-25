@@ -120,11 +120,11 @@ export default function ScanScreen() {
   return (
     <SafeAreaView
       className="flex-1"
-      edges={["top"]}
+      edges={[]}
       style={{ backgroundColor: colors.background }}
     >
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      <View className="flex-1 px-4">
+      <View className="flex-1 px-4 pt-4">
         <View className="flex-1 items-center justify-center">
           {permissionPending ? (
             <View className="items-center gap-3 py-10">

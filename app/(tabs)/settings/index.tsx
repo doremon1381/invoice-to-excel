@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { GoogleSheetPickerModal } from "@/components/settings/GoogleSheetPickerModal";
@@ -24,25 +24,25 @@ import {
 import { i18n } from "@/lib/i18n";
 import { Storage, type AppLocale } from "@/lib/storage";
 
-type SettingsPalette = (typeof Colors)[keyof typeof Colors];
-type PreferenceOption = {
+type SettingToggleOption = {
   key: string;
   label: string;
   active: boolean;
   onPress: () => void;
 };
 
+const SETTING_OPTION_HORIZONTAL_PADDING = 12;
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
-  const isCompactLayout = width <= 430;
   const { colorScheme: themeMode, setThemeMode } = useAppTheme();
   const [selectedSpreadsheet, setSelectedSpreadsheet] =
     useState<SelectedGoogleSpreadsheet | null>(null);
   const [isSheetPickerVisible, setIsSheetPickerVisible] = useState(false);
+  const [maxSettingLabelWidth, setMaxSettingLabelWidth] = useState(0);
   const {
     account,
     error: googleAuthError,
@@ -108,58 +108,67 @@ export default function SettingsScreen() {
     setIsSheetPickerVisible(false);
   }
 
+  const handleMeasureSettingLabel = useCallback((width: number) => {
+    const roundedWidth = Math.ceil(width);
+    setMaxSettingLabelWidth((current) =>
+      roundedWidth > current ? roundedWidth : current,
+    );
+  }, []);
+
+  const settingOptionWidth =
+    maxSettingLabelWidth > 0
+      ? maxSettingLabelWidth + SETTING_OPTION_HORIZONTAL_PADDING * 2
+      : undefined;
+
   return (
     <ScreenContainer scroll safeAreaTop={false}>
       <PageTitle title={t("settings.title")} />
 
-      <Card className="mt-5 rounded-[28px] border p-4">
-        <View style={styles.preferenceGroup}>
-          <PreferenceRow
-            compact={isCompactLayout}
-            colors={colors}
-            label={t("settings.appearance")}
-            options={[
-              {
-                key: "light",
-                label: t("settings.lightMode"),
-                active: themeMode === "light",
-                onPress: () => void setThemeMode("light"),
-              },
-              {
-                key: "dark",
-                label: t("settings.darkMode"),
-                active: themeMode === "dark",
-                onPress: () => void setThemeMode("dark"),
-              },
-            ]}
-          />
-          <View
-            style={[
-              styles.preferenceDivider,
-              { backgroundColor: colors.divider },
-            ]}
-          />
-          <PreferenceRow
-            compact={isCompactLayout}
-            colors={colors}
-            label={t("settings.language")}
-            options={[
-              {
-                key: "vi",
-                label: t("settings.vietnamese"),
-                active: activeLocale === "vi",
-                onPress: () => void setLocale("vi"),
-              },
-              {
-                key: "en",
-                label: t("settings.english"),
-                active: activeLocale === "en",
-                onPress: () => void setLocale("en"),
-              },
-            ]}
-          />
-        </View>
-      </Card>
+      <View className="mt-5 gap-3 rounded-2xl bg-surface p-4 dark:bg-surface-dark">
+        <SettingToggleRow
+          colors={colors}
+          label={t("settings.appearance")}
+          onMeasureLabelWidth={handleMeasureSettingLabel}
+          optionWidth={settingOptionWidth}
+          options={[
+            {
+              key: "light",
+              label: t("settings.lightMode"),
+              active: themeMode === "light",
+              onPress: () => void setThemeMode("light"),
+            },
+            {
+              key: "dark",
+              label: t("settings.darkMode"),
+              active: themeMode === "dark",
+              onPress: () => void setThemeMode("dark"),
+            },
+          ]}
+        />
+
+        <View className="h-px bg-divider dark:bg-divider-dark" />
+
+        <SettingToggleRow
+          colors={colors}
+          label={t("settings.language")}
+          onMeasureLabelWidth={handleMeasureSettingLabel}
+          optionWidth={settingOptionWidth}
+          options={[
+            {
+              key: "vi",
+              label: t("settings.vietnamese"),
+              active: activeLocale === "vi",
+              onPress: () => void setLocale("vi"),
+            },
+            {
+              key: "en",
+              label: t("settings.english"),
+              active: activeLocale === "en",
+              onPress: () => void setLocale("en"),
+            },
+          ]}
+        />
+      </View>
 
       {/* TODO: Add AI extraction card later */}
       {/* <Card className="mt-5 rounded-[28px] border p-5">
@@ -178,6 +187,14 @@ export default function SettingsScreen() {
           iconName="tablecells.fill"
           title={t("settings.googleSheets")}
         />
+        <ThemedText
+          className="pl-10"
+          scaleRole="body"
+          style={{ color: colors.muted }}
+          type="body"
+        >
+          {t("settings.googleSheetsDescription")}
+        </ThemedText>
       </View>
 
       <Card className="mt-4 rounded-[28px] border p-5">
@@ -390,37 +407,27 @@ function GoogleSheetInfoBox({
   );
 }
 
-function PreferenceRow({
-  compact,
+function SettingToggleRow({
   colors,
   label,
+  onMeasureLabelWidth,
+  optionWidth,
   options,
 }: {
-  compact: boolean;
-  colors: SettingsPalette;
+  colors: (typeof Colors)[keyof typeof Colors];
   label: string;
-  options: PreferenceOption[];
+  onMeasureLabelWidth: (width: number) => void;
+  optionWidth?: number;
+  options: SettingToggleOption[];
 }) {
   return (
-    <View style={[styles.preferenceRow, compact && styles.preferenceRowCompact]}>
-      <View style={[styles.preferenceLabelWrap, compact && styles.preferenceLabelWrapCompact]}>
-        <ThemedText
-          scaleRole="chrome"
-          style={styles.preferenceLabel}
-          type="defaultSemiBold"
-        >
-          {label}
-        </ThemedText>
-      </View>
-
+    <View style={styles.settingRow}>
+      <ThemedText className="font-semibold" scaleRole="chrome" type="custom">
+        {label}
+      </ThemedText>
       <View
-        style={[
-          styles.preferencePill,
-          compact && styles.preferencePillCompact,
-          {
-            backgroundColor: colors.surfaceAlt,
-          },
-        ]}
+        className="flex-row rounded-full p-1"
+        style={{ backgroundColor: colors.surfaceAlt }}
       >
         {options.map((option) => (
           <Pressable
@@ -429,8 +436,8 @@ function PreferenceRow({
             accessibilityState={option.active ? { selected: true } : {}}
             onPress={option.onPress}
             style={({ pressed }) => [
-              styles.preferenceOption,
-              compact && styles.preferenceOptionCompact,
+              styles.settingOption,
+              optionWidth ? { width: optionWidth } : null,
               {
                 backgroundColor: option.active ? colors.accent : "transparent",
                 opacity: pressed ? 0.88 : 1,
@@ -438,8 +445,11 @@ function PreferenceRow({
             ]}
           >
             <ThemedText
-              className="text-sm font-bold"
+              className="font-semibold"
               numberOfLines={1}
+              onLayout={({ nativeEvent }) =>
+                onMeasureLabelWidth(nativeEvent.layout.width)
+              }
               scaleRole="chrome"
               style={{
                 color: option.active ? colors.onAccent : colors.mutedLight,
@@ -457,52 +467,19 @@ function PreferenceRow({
 }
 
 const styles = StyleSheet.create({
-  preferenceGroup: {
-    gap: 14,
-  },
-  preferenceRow: {
+  settingRow: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
   },
-  preferenceRowCompact: {
-    alignItems: "stretch",
-    flexDirection: "column",
-  },
-  preferenceLabelWrap: {
-    flex: 1,
-  },
-  preferenceLabelWrapCompact: {
-    width: "100%",
-  },
-  preferenceLabel: {
-    lineHeight: 22,
-  },
-  preferenceDivider: {
-    height: StyleSheet.hairlineWidth,
-  },
-  preferencePill: {
-    borderRadius: 20,
-    flexDirection: "row",
-    padding: 4,
-    gap: 4,
-  },
-  preferencePillCompact: {
-    width: "100%",
-  },
-  preferenceOption: {
+  settingOption: {
     alignItems: "center",
     borderRadius: 16,
-    flex: 1,
     justifyContent: "center",
     minHeight: 40,
-    minWidth: 0,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  preferenceOptionCompact: {
-    minHeight: 44,
+    paddingHorizontal: SETTING_OPTION_HORIZONTAL_PADDING,
+    paddingVertical: 6,
   },
   googleSheetActionWrap: {
     alignItems: "center",

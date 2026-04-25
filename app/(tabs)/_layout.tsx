@@ -27,7 +27,7 @@ function shouldShowAppShell(segments: string[]) {
     return true;
   }
 
-  return segments.length === 2 && segments[1] === "settings";
+  return segments.length === 2 && ["scan", "settings"].includes(segments[1]);
 }
 
 export default function TabLayout() {
