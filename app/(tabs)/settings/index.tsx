@@ -109,7 +109,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll safeAreaTop={false}>
       <PageTitle title={t("settings.title")} />
 
       <Card className="mt-5 rounded-[28px] border p-4">

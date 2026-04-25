@@ -1,5 +1,6 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Tabs } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Tabs, useSegments } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,77 +12,130 @@ import { Typography } from "@/constants/typography";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 
+const APP_HEADER_LABEL = "Doremon";
+const APP_HEADER_MIN_HEIGHT = 96;
+const APP_HEADER_CONTENT_HEIGHT = 44;
+const APP_HEADER_MIN_TOP_PADDING = 16;
+const APP_HEADER_BOTTOM_PADDING = 12;
+
+function shouldShowAppShell(segments: string[]) {
+  if (segments[0] !== "(tabs)") {
+    return false;
+  }
+
+  if (segments.length === 1) {
+    return true;
+  }
+
+  return segments.length === 2 && segments[1] === "settings";
+}
+
 export default function TabLayout() {
   const { t, i18n } = useTranslation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const segments = useSegments();
+  const insets = useSafeAreaInsets();
   const language = i18n.resolvedLanguage ?? i18n.language;
+  const showAppShell = shouldShowAppShell(segments);
+  const headerTopPadding = Math.max(insets.top, APP_HEADER_MIN_TOP_PADDING);
+  const appShellHeight = showAppShell
+    ? Math.max(
+        APP_HEADER_MIN_HEIGHT,
+        headerTopPadding + APP_HEADER_CONTENT_HEIGHT + APP_HEADER_BOTTOM_PADDING,
+      )
+    : 0;
 
   return (
-    <Tabs
-      key={language}
-      tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{
-        headerShown: true,
-        headerShadowVisible: false,
-        headerStyle: {
-          backgroundColor: colors.background,
-        },
-        headerTitleStyle: {
-          color: colors.foreground,
-          fontSize: Typography.xl.size,
-          fontWeight: "700",
-        },
-        headerTintColor: colors.foreground,
-        sceneStyle: {
-          backgroundColor: colors.background,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t("tabs.home"),
+    <View style={[styles.layoutRoot, { backgroundColor: colors.background }]}>
+      <Tabs
+        key={language}
+        detachInactiveScreens
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <IconSymbol
-              name="house.fill"
-              size={22}
-              color={focused ? colors.accent : colors.mutedLight}
-            />
-          ),
+          freezeOnBlur: true,
+          animation: "none",
+          sceneStyle: {
+            backgroundColor: colors.background,
+            paddingTop: appShellHeight,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="scan"
-        options={{
-          title: t("tabs.scan"),
-          headerTitle: t("tabs.scanInvoice"),
-          tabBarIcon: ({ focused }) => (
-            <IconSymbol
-              name="camera.fill"
-              size={22}
-              color={focused ? colors.accent : colors.mutedLight}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: t("tabs.settings"),
-          headerTitle: t("tabs.settings"),
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <IconSymbol
-              name="gearshape.fill"
-              size={22}
-              color={focused ? colors.accent : colors.mutedLight}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: t("tabs.home"),
+            tabBarIcon: ({ focused }) => (
+              <IconSymbol
+                name="house.fill"
+                size={22}
+                color={focused ? colors.accent : colors.mutedLight}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="scan"
+          options={{
+            title: t("tabs.scan"),
+            tabBarIcon: ({ focused }) => (
+              <IconSymbol
+                name="camera.fill"
+                size={22}
+                color={focused ? colors.accent : colors.mutedLight}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: t("tabs.settings"),
+            tabBarIcon: ({ focused }) => (
+              <IconSymbol
+                name="gearshape.fill"
+                size={22}
+                color={focused ? colors.accent : colors.mutedLight}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+
+      {showAppShell ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.appShell,
+            {
+              height: appShellHeight,
+              paddingTop: headerTopPadding,
+              paddingBottom: APP_HEADER_BOTTOM_PADDING,
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+              shadowColor: colors.foreground,
+            },
+          ]}
+        >
+          <View style={styles.appShellContent}>
+            <ThemedText
+              accessibilityRole="header"
+              className="text-center font-bold"
+              scaleRole="chrome"
+              style={{
+                color: colors.accent,
+                fontSize: Typography.display.size,
+                lineHeight: Typography.display.lineHeight,
+              }}
+              type="custom"
+            >
+              {APP_HEADER_LABEL}
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -101,6 +155,15 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         },
       ]}
     >
+      <View pointerEvents="none" style={styles.tabBarAccentLine}>
+        <LinearGradient
+          colors={["transparent", colors.accent, "transparent"]}
+          end={{ x: 1, y: 0 }}
+          start={{ x: 0, y: 0 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </View>
+
       <View style={styles.tabBarRow}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -182,10 +245,40 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
+  layoutRoot: {
+    flex: 1,
+  },
+  appShell: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  appShellContent: {
+    minHeight: APP_HEADER_CONTENT_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
   tabBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  tabBarAccentLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 2,
   },
   tabBarRow: {
     flexDirection: "row",

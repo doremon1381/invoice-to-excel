@@ -10,7 +10,6 @@ import { useTranslation } from "react-i18next";
 import { CameraViewfinder } from "@/components/scan/CameraViewfinder";
 import { LoadingOverlay } from "@/components/scan/LoadingOverlay";
 import { ScanControls } from "@/components/scan/ScanControls";
-import { ScanHeader } from "@/components/scan/ScanHeader";
 import { ErrorState } from "@/components/shared/ui/ErrorState";
 import { Colors } from "@/constants/theme";
 import { clearPendingScan, setPendingScan } from "@/lib/pendingScan";
@@ -44,7 +43,6 @@ export default function ScanScreen() {
     error,
     isLoading,
     pickFromLibrary,
-    previewData,
     previewUri,
     setError,
   } = useInvoiceScan();
@@ -118,11 +116,6 @@ export default function ScanScreen() {
   const cameraBlocked = Boolean(
     needsCamera && permission !== null && !permission.granted,
   );
-  const headerTitle = isLoading
-    ? t("scan.headerTranslating")
-    : previewData && !error
-      ? t("scan.headerDone")
-      : t("scan.headerReady");
 
   return (
     <SafeAreaView
@@ -132,14 +125,7 @@ export default function ScanScreen() {
     >
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <View className="flex-1 px-4">
-        <ScanHeader
-          colors={colors}
-          title={headerTitle}
-          onClose={() => router.back()}
-          onOpenSettings={() => router.push("/(tabs)/settings")}
-        />
-
-        <View className="mt-4 flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center">
           {permissionPending ? (
             <View className="items-center gap-3 py-10">
               <ActivityIndicator color={colors.accent} size="large" />

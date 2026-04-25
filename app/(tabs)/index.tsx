@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, FlatList, Pressable, View, useWindowDimensions } from "react-native";
+import { Alert, FlatList, View, useWindowDimensions } from "react-native";
 
 import { ExpenseOverview } from "@/components/home/ExpenseOverview";
 import { InvoiceFilterBar } from "@/components/home/InvoiceFilterBar";
@@ -10,7 +10,6 @@ import { InvoiceCard } from "@/components/invoice/InvoiceCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ThemedText } from "@/components/shared/themed-text";
 import { ErrorState } from "@/components/shared/ui/ErrorState";
-import { IconSymbol } from "@/components/shared/ui/icon-symbol";
 import { LoadingState } from "@/components/shared/ui/LoadingState";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
 import { Colors } from "@/constants/theme";
@@ -125,30 +124,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScreenContainer className="pb-28">
+    <ScreenContainer className="pb-28" safeAreaTop={false}>
       <View className="flex-1">
-        <View className="mb-4 flex-row items-center justify-between">
-          <View />
-          <Pressable
-            accessibilityLabel={t("home.openSettingsA11y")}
-            accessibilityRole="button"
-            className="h-10 w-10 items-center justify-center rounded-full"
-            onPress={() => router.push("/(tabs)/settings")}
-            style={({ pressed }) => ({
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderWidth: 1,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <IconSymbol
-              name="gearshape.fill"
-              size={18}
-              color={colors.foreground}
-            />
-          </Pressable>
-        </View>
-
         <View className={isCompactDashboard ? "mb-4 gap-4" : "mb-4 flex flex-row gap-4"}>
           <ExpenseOverview
             currency={monthlyExpense.currency}
