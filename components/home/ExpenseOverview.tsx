@@ -49,11 +49,11 @@ export function ExpenseOverview({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="summary"
       accessible
-      className="min-h-[142px] rounded-[24px] border border-transparent px-4 py-4"
+      className="min-h-[142px] flex-1 rounded-[24px] border border-transparent px-4 py-4"
       style={{ backgroundColor: colors.accent }}
     >
       <View className="mb-2 flex-row items-start justify-between">
-        <ThemedText type="overline" style={{ color: colors.onAccentMuted }}>
+        <ThemedText type="overline" scaleRole="chrome" style={{ color: colors.onAccentMuted }}>
           {t("home.thisMonth")}
         </ThemedText>
         <View
@@ -64,12 +64,13 @@ export function ExpenseOverview({
         </View>
       </View>
 
-      <ThemedText
-        type="custom"
-        className="text-md font-semibold"
-        style={{
-          color: colors.onAccentMuted,
-          fontSize: Typography.md.size,
+        <ThemedText
+          type="custom"
+          className="text-md font-semibold"
+          scaleRole="chrome"
+          style={{
+            color: colors.onAccentMuted,
+            fontSize: Typography.md.size,
           lineHeight: Typography.md.lineHeight,
         }}
       >
@@ -80,6 +81,7 @@ export function ExpenseOverview({
         <ThemedText
           type="custom"
           className="text-display-lg font-bold"
+          scaleRole="heading"
           style={{
             color: colors.onAccent,
             fontSize: Typography.displayLg.size,
@@ -91,6 +93,7 @@ export function ExpenseOverview({
         <ThemedText
           type="custom"
           className="text-lead font-semibold"
+          scaleRole="heading"
           style={{
             color: colors.onAccent,
             fontSize: Typography.lead.size,
@@ -105,6 +108,7 @@ export function ExpenseOverview({
         <ThemedText
           type="custom"
           className="text-caption mt-2"
+          scaleRole="chrome"
           style={{ color: colors.onAccentMuted }}
         >
           {t("home.monthExpenseEmpty")}

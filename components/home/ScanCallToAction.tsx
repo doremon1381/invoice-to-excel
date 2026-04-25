@@ -19,7 +19,7 @@ export function ScanCallToAction({ onPress }: ScanCallToActionProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      className="mt-3 min-h-[142px] flex-col rounded-[24px] px-4 py-4"
+      className="min-h-[142px] flex-1 flex-col rounded-[24px] px-4 py-4"
       onPress={onPress}
       style={({ pressed }) => ({
         backgroundColor: colors.accent,
@@ -37,6 +37,7 @@ export function ScanCallToAction({ onPress }: ScanCallToActionProps) {
         <ThemedText
           type="custom"
           className="text-display font-bold"
+          scaleRole="heading"
           style={{
             color: colors.onAccent,
             fontSize: Typography.display.size,
@@ -48,6 +49,7 @@ export function ScanCallToAction({ onPress }: ScanCallToActionProps) {
         <ThemedText
           type="custom"
           className="text-display font-bold"
+          scaleRole="heading"
           style={{
             color: colors.onAccent,
             fontSize: Typography.display.size,

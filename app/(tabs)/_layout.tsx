@@ -1,10 +1,11 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
+import { ThemedText } from "@/components/shared/themed-text";
 import { IconSymbol } from "@/components/shared/ui/icon-symbol";
 import { Typography } from "@/constants/typography";
 import { Colors } from "@/constants/theme";
@@ -156,7 +157,10 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               >
                 {icon}
               </View>
-              <Text
+              <ThemedText
+                className="text-xs font-semibold"
+                numberOfLines={1}
+                scaleRole="chrome"
                 style={[
                   styles.label,
                   {
@@ -165,9 +169,10 @@ function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                     lineHeight: Typography.xs.lineHeight,
                   },
                 ]}
+                type="custom"
               >
                 {label}
-              </Text>
+              </ThemedText>
             </HapticTab>
           );
         })}
@@ -180,13 +185,13 @@ const styles = StyleSheet.create({
   tabBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   tabBarRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-around",
-    minHeight: 64,
+    minHeight: 68,
   },
   tabItem: {
     flex: 1,
@@ -204,7 +209,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   label: {
-    marginTop: 2,
-    fontWeight: "600",
+    marginTop: 4,
+    textAlign: "center",
   },
 });

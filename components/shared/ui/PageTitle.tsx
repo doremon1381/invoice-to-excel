@@ -50,6 +50,7 @@ export function PageTitle({
             numberOfLines={1}
             ellipsizeMode="tail"
             className={titleClassName}
+            scaleRole="chrome"
           >
             {title}
           </ThemedText>

@@ -36,7 +36,7 @@ export function InvoiceFilterBar({
           <Pressable
             key={option.value}
             accessibilityRole="button"
-            className="flex-1 rounded-2xl px-4 py-2"
+            className="flex-1 rounded-2xl px-3 py-2.5"
             onPress={() => onChange(option.value)}
             style={{
               backgroundColor: isActive ? colors.surface : "transparent",
@@ -50,6 +50,8 @@ export function InvoiceFilterBar({
             <ThemedText
               type="custom"
               className="text-center text-caption font-bold"
+              numberOfLines={1}
+              scaleRole="chrome"
               style={{
                 color: isActive ? colors.foreground : colors.muted,
               }}

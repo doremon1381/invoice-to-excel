@@ -75,11 +75,17 @@ function SummaryRow({
   emphasized?: boolean;
 }) {
   return (
-    <View className="flex-row justify-between gap-4">
-      <ThemedText type={emphasized ? "defaultSemiBold" : "default"}>
+    <View className="flex-row items-start justify-between gap-4">
+      <ThemedText
+        className="min-w-0 flex-1"
+        type={emphasized ? "defaultSemiBold" : "default"}
+      >
         {label}
       </ThemedText>
-      <ThemedText type={emphasized ? "defaultSemiBold" : "default"}>
+      <ThemedText
+        className="min-w-0 flex-1 text-right"
+        type={emphasized ? "defaultSemiBold" : "default"}
+      >
         {value}
       </ThemedText>
     </View>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, TextInput, View, type TextInputProps } from 'react-native';
 
+import { ThemedText, getTextMaxFontSizeMultiplier } from '@/components/shared/themed-text';
 import { Typography } from '@/constants/typography';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
@@ -23,9 +24,14 @@ export function FieldInput({
 
   return (
     <View className="gap-1.5">
-      <Text className="text-caption font-medium" style={{ color: colors.muted }}>
+      <ThemedText
+        className="text-caption font-medium"
+        scaleRole="chrome"
+        style={{ color: colors.muted }}
+        type="custom"
+      >
         {label}
-      </Text>
+      </ThemedText>
       <View
         className="min-h-[52px] flex-row items-center rounded-[18px] border px-3"
         style={{
@@ -33,12 +39,15 @@ export function FieldInput({
           borderColor: accentBorder ? colors.accent : colors.border,
         }}>
         <TextInput
+          allowFontScaling
+          maxFontSizeMultiplier={getTextMaxFontSizeMultiplier('body')}
           placeholderTextColor={colors.muted}
           style={[
             {
               color: colors.foreground,
               flex: 1,
               fontSize: Typography.base.size,
+              includeFontPadding: Platform.OS === 'android' ? false : undefined,
               lineHeight: Typography.base.lineHeight,
               paddingVertical: 12,
             },

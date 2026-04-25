@@ -1,7 +1,8 @@
 import { CameraView, type CameraType } from 'expo-camera';
-import { Image, Platform, Text, View } from 'react-native';
+import { Image, Platform, View } from 'react-native';
 import type { RefObject } from 'react';
 
+import { ThemedText } from '@/components/shared/themed-text';
 import type { Colors } from '@/constants/theme';
 
 const BRACKET_LEN = 28;
@@ -111,11 +112,16 @@ export function CameraViewfinder({
         <Image resizeMode="cover" source={{ uri: staticImageUri }} style={{ flex: 1 }} />
       ) : (
         <View className="flex-1 items-center justify-center px-6" style={{ backgroundColor: colors.surface }}>
-          <Text className="text-center text-sm" style={{ color: colors.muted }}>
+          <ThemedText
+            className="text-center text-sm"
+            scaleRole="chrome"
+            style={{ color: colors.muted }}
+            type="custom"
+          >
             {Platform.OS === 'web'
               ? 'Live camera is not available in the browser. Use Import to choose an image.'
               : 'Camera preview unavailable.'}
-          </Text>
+          </ThemedText>
         </View>
       )}
 

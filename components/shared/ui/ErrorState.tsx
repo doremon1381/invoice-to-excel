@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/shared/themed-text';
@@ -30,7 +30,7 @@ export function ErrorState({
     <Card className="rounded-[24px] px-4 py-3" tone={variant === 'dark' ? 'surfaceAlt' : 'surface'}>
       <View className="gap-3">
         {variant === 'dark' ? (
-          <Text style={{ color: colors.danger }}>{message}</Text>
+          <ThemedText style={{ color: colors.danger }}>{message}</ThemedText>
         ) : (
           <ThemedText style={{ color: colors.danger }}>{message}</ThemedText>
         )}

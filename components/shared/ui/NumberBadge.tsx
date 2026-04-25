@@ -1,5 +1,6 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { ThemedText } from '@/components/shared/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
@@ -15,9 +16,14 @@ export function NumberBadge({ value }: NumberBadgeProps) {
     <View
       className="h-9 w-9 items-center justify-center rounded-full"
       style={{ backgroundColor: colors.foreground }}>
-      <Text className="text-sm font-extrabold" style={{ color: colors.background }}>
+      <ThemedText
+        className="text-sm font-extrabold"
+        scaleRole="chrome"
+        style={{ color: colors.background }}
+        type="custom"
+      >
         {value}
-      </Text>
+      </ThemedText>
     </View>
   );
 }

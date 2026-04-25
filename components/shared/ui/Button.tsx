@@ -1,5 +1,6 @@
-import { Pressable, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
+import { ThemedText } from '@/components/shared/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/theme/use-color-scheme';
 
@@ -42,11 +43,12 @@ export function Button({
         const baseStyle: ViewStyle = {
           alignItems: 'center',
           borderRadius: size === 'sm' ? 999 : 16,
+          flexDirection: 'row',
           justifyContent: 'center',
-          minHeight: size === 'sm' ? 36 : 48,
+          minHeight: size === 'sm' ? 40 : 52,
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
-          paddingHorizontal: size === 'sm' ? 14 : 16,
-          paddingVertical: size === 'sm' ? 8 : 10,
+          paddingHorizontal: size === 'sm' ? 16 : 18,
+          paddingVertical: size === 'sm' ? 8 : 12,
         };
 
         if (variant === 'secondary') {
@@ -65,9 +67,15 @@ export function Button({
       }}
       {...props}
     >
-      <Text style={{ color: labelColor, fontWeight: '700' }}>
+      <ThemedText
+        className={size === 'sm' ? 'text-sm font-bold' : 'text-base font-bold'}
+        numberOfLines={1}
+        scaleRole="chrome"
+        style={{ color: labelColor, flexShrink: 1, textAlign: 'center' }}
+        type="custom"
+      >
         {loading ? `${label}...` : label}
-      </Text>
+      </ThemedText>
     </Pressable>
   );
 }

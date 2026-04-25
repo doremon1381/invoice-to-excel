@@ -45,7 +45,12 @@ export function IconSectionTitle({
       >
         <IconSymbol color={iconColor} name={iconName} size={iconSize} />
       </View>
-      <ThemedText type="heading" className={titleClassName}>
+      <ThemedText
+        type="heading"
+        className={["min-w-0 flex-1", titleClassName].filter(Boolean).join(" ")}
+        numberOfLines={1}
+        scaleRole="chrome"
+      >
         {title}
       </ThemedText>
     </View>

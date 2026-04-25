@@ -107,7 +107,12 @@ export function InvoiceCard({
             <ThemedText type="defaultSemiBold">
               {invoice.vendor_name ?? t("invoice.unknownVendor")}
             </ThemedText>
-            <ThemedText type="custom" className="text-caption" style={{ color: colors.muted }}>
+            <ThemedText
+              type="custom"
+              className="text-caption"
+              scaleRole="chrome"
+              style={{ color: colors.muted }}
+            >
               {invoice.invoice_date ?? t("invoice.unknownDate")}
             </ThemedText>
           </View>
@@ -116,6 +121,7 @@ export function InvoiceCard({
             <ThemedText
               type="custom"
               className="text-xs font-semibold"
+              scaleRole="chrome"
               style={{ color: colors.muted }}
             >
               {t("common.total")}
@@ -124,6 +130,7 @@ export function InvoiceCard({
               type="custom"
               numberOfLines={1}
               className="text-lead font-semibold"
+              scaleRole="heading"
             >
               {formatAmount(invoice.total_amount, invoice.currency, locale)}
             </ThemedText>
@@ -137,6 +144,7 @@ export function InvoiceCard({
               <ThemedText
                 type="custom"
                 className="text-tiny font-bold"
+                scaleRole="chrome"
                 style={{
                   color: colors.onAccent,
                 }}
@@ -147,6 +155,8 @@ export function InvoiceCard({
             <ThemedText
               type="custom"
               className="text-xs font-bold capitalize"
+              numberOfLines={1}
+              scaleRole="chrome"
               style={{
                 color: badgeColor,
               }}

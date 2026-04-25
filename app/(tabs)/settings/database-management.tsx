@@ -1,6 +1,6 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { ThemedText } from "@/components/shared/themed-text";
@@ -21,8 +21,10 @@ import type { ExportHistoryEntry } from "@/lib/types";
 
 export default function DatabaseManagementScreen() {
   const { t, i18n } = useTranslation();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const isCompactLayout = width <= 430;
   const locale = getIntlLocale(i18n.resolvedLanguage ?? i18n.language);
   const { exportAll, isExporting } = useInvoiceExport();
   const [recordCount, setRecordCount] = useState(0);
@@ -130,7 +132,7 @@ export default function DatabaseManagementScreen() {
 
   if (isLoading) {
     return (
-      <ScreenContainer padded={false}>
+      <ScreenContainer padded={false} safeAreaTop={false}>
         <LoadingState message={t("database.loadingMetrics")} />
       </ScreenContainer>
     );
@@ -138,21 +140,21 @@ export default function DatabaseManagementScreen() {
 
   if (error) {
     return (
-      <ScreenContainer>
+      <ScreenContainer safeAreaTop={false}>
         <ErrorState message={error} onRetry={() => void loadData()} />
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer safeAreaTop={false} scroll>
       <SectionTitle
         title={t("database.title")}
         description={t("database.subtitle")}
       />
 
       <Card className="mt-5 rounded-[28px] border p-5">
-        <View className="flex-row gap-3">
+        <View className={isCompactLayout ? "gap-3" : "flex-row gap-3"}>
           <View
             className="flex-1 rounded-2xl border px-4 py-4"
             style={{ borderColor: colors.border }}
@@ -166,6 +168,7 @@ export default function DatabaseManagementScreen() {
             <ThemedText
               type="custom"
               className="mt-2 text-display font-bold"
+              scaleRole="heading"
             >
               {recordCount}
             </ThemedText>
@@ -186,6 +189,7 @@ export default function DatabaseManagementScreen() {
             <ThemedText
               type="custom"
               className="mt-2 text-display font-bold"
+              scaleRole="heading"
             >
               {storageSize}
             </ThemedText>
@@ -197,7 +201,9 @@ export default function DatabaseManagementScreen() {
       </Card>
 
       <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">{t("database.history")}</ThemedText>
+        <ThemedText type="defaultSemiBold" scaleRole="chrome">
+          {t("database.history")}
+        </ThemedText>
         <View className="mt-4 gap-3">
           <View className="flex-row px-1">
             <ThemedText
@@ -270,7 +276,9 @@ export default function DatabaseManagementScreen() {
       </Card>
 
       <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">{t("database.recentExports")}</ThemedText>
+        <ThemedText type="defaultSemiBold" scaleRole="chrome">
+          {t("database.recentExports")}
+        </ThemedText>
         <View className="mt-4 gap-3">
           {recentExports.length === 0 ? (
             <ThemedText style={{ color: colors.muted }}>

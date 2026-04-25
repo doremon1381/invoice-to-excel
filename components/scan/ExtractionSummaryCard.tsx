@@ -31,26 +31,58 @@ export function ExtractionSummaryCard({
         backgroundColor: `${colors.surface}F2`,
         borderColor: colors.border,
       }}>
-      <Text className="text-xs font-bold" style={{ color: colors.foreground, fontFamily: 'monospace' }}>
+      <Text
+        allowFontScaling={false}
+        className="text-xs font-bold"
+        maxFontSizeMultiplier={1}
+        style={{ color: colors.foreground, fontFamily: 'monospace', includeFontPadding: false }}
+      >
         EXTRACTION SUMMARY
       </Text>
       <View className="mt-3 gap-1">
-        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
+        <Text
+          allowFontScaling={false}
+          className="text-tiny"
+          maxFontSizeMultiplier={1}
+          style={{ color: colors.muted, fontFamily: 'monospace', includeFontPadding: false }}
+        >
           {`"vendor": ${summaryVendor ? `"${summaryVendor}"` : 'null'}`}
         </Text>
-        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
+        <Text
+          allowFontScaling={false}
+          className="text-tiny"
+          maxFontSizeMultiplier={1}
+          style={{ color: colors.muted, fontFamily: 'monospace', includeFontPadding: false }}
+        >
           {`"date": ${summaryDate ? `"${summaryDate}"` : 'null'}`}
         </Text>
-        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>
+        <Text
+          allowFontScaling={false}
+          className="text-tiny"
+          maxFontSizeMultiplier={1}
+          style={{ color: colors.muted, fontFamily: 'monospace', includeFontPadding: false }}
+        >
           {`"total": ${
             summaryTotal !== null && summaryTotal !== undefined
               ? `"${summaryTotal.toFixed(2)} ${previewData?.extracted.currency ?? 'VND'}"`
               : 'null'
           }`}
         </Text>
-        <Text className="text-tiny" style={{ color: colors.muted, fontFamily: 'monospace' }}>{`"status": "${summaryStatus}"`}</Text>
+        <Text
+          allowFontScaling={false}
+          className="text-tiny"
+          maxFontSizeMultiplier={1}
+          style={{ color: colors.muted, fontFamily: 'monospace', includeFontPadding: false }}
+        >
+          {`"status": "${summaryStatus}"`}
+        </Text>
         {!summaryVendor && summarySnippet ? (
-          <Text className="text-2xs" style={{ color: colors.muted, fontFamily: 'monospace' }}>
+          <Text
+            allowFontScaling={false}
+            className="text-2xs"
+            maxFontSizeMultiplier={1}
+            style={{ color: colors.muted, fontFamily: 'monospace', includeFontPadding: false }}
+          >
             {`"text": "${summarySnippet}${previewData?.rawText && previewData.rawText.length > 42 ? '…' : ''}"`}
           </Text>
         ) : null}

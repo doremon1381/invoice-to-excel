@@ -13,12 +13,16 @@ import {
   ScrollView,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FinancialSummary } from "@/components/invoice/FinancialSummary";
 import { LoadingOverlay } from "@/components/scan/LoadingOverlay";
-import { ThemedText } from "@/components/shared/themed-text";
+import {
+  ThemedText,
+  getTextMaxFontSizeMultiplier,
+} from "@/components/shared/themed-text";
 import { ThemedView } from "@/components/shared/themed-view";
 import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
@@ -227,8 +231,10 @@ export default function InvoiceDetailScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const isCompactHeader = width <= 420;
   const { exportSingle, isExporting } = useInvoiceExport();
   const { isPushing, pushInvoice } = usePushInvoiceToSheet();
 
@@ -653,6 +659,36 @@ export default function InvoiceDetailScreen() {
     invoice.sheet_sync_status === "failed"
       ? t("invoice.retryPushToSheet")
       : t("invoice.pushToSheet");
+  const invoiceThumbnail = (
+    <Image
+      source={{ uri: activeHeaderImageUri }}
+      className="h-12 w-12 rounded-xl border"
+      style={{ borderColor: colors.border }}
+      onError={() => {
+        if (fallbackImageUri && activeHeaderImageUri !== fallbackImageUri) {
+          setHeaderImageUri(fallbackImageUri);
+        }
+      }}
+    />
+  );
+  const invoiceActionButtons = isPreviewMode ? null : (
+    <>
+      <Button
+        disabled={isPushing || invoice.sheet_sync_status === "synced"}
+        label={pushButtonLabel}
+        size={isCompactHeader ? "md" : "sm"}
+        variant="secondary"
+        onPress={() => void handlePushToSheet()}
+      />
+      <Button
+        disabled={isExporting || isPushing}
+        label={isExporting ? t("invoice.exporting") : t("invoice.export")}
+        size={isCompactHeader ? "md" : "sm"}
+        variant="secondary"
+        onPress={() => void handleExport()}
+      />
+    </>
+  );
 
   return (
     <ThemedView className="flex-1">
@@ -660,58 +696,42 @@ export default function InvoiceDetailScreen() {
         contentContainerStyle={{
           paddingBottom: insets.bottom + 132,
           paddingHorizontal: 20,
-          paddingTop: 16,
+          paddingTop: insets.top + 16,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center justify-between">
-          <Pressable
-            accessibilityLabel={t("invoice.goBackA11y")}
-            className="h-10 w-10 items-center justify-center rounded-full"
-            onPress={() => router.back()}
-            style={({ pressed }) => ({
-              backgroundColor: colors.surfaceAlt,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <IconSymbol
-              name="chevron.left"
-              size={22}
-              color={colors.foreground}
-            />
-          </Pressable>
+        <View className="gap-3">
+          <View className="flex-row items-center justify-between">
+            <Pressable
+              accessibilityLabel={t("invoice.goBackA11y")}
+              className="h-10 w-10 items-center justify-center rounded-full"
+              onPress={() => router.back()}
+              style={({ pressed }) => ({
+                backgroundColor: colors.surfaceAlt,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <IconSymbol
+                name="chevron.left"
+                size={22}
+                color={colors.foreground}
+              />
+            </Pressable>
 
-          <View className="flex-row items-center gap-2">
-            {isPreviewMode ? null : (
-              <>
-                <Button
-                  disabled={isPushing || invoice.sheet_sync_status === "synced"}
-                  label={pushButtonLabel}
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => void handlePushToSheet()}
-                />
-                <Button
-                  disabled={isExporting || isPushing}
-                  label={isExporting ? t("invoice.exporting") : t("invoice.export")}
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => void handleExport()}
-                />
-              </>
+            {isCompactHeader ? (
+              invoiceThumbnail
+            ) : (
+              <View className="flex-row items-center gap-2">
+                {invoiceActionButtons}
+                {invoiceThumbnail}
+              </View>
             )}
-            <Image
-              source={{ uri: activeHeaderImageUri }}
-              className="h-12 w-12 rounded-xl border"
-              style={{ borderColor: colors.border }}
-              onError={() => {
-                if (fallbackImageUri && activeHeaderImageUri !== fallbackImageUri) {
-                  setHeaderImageUri(fallbackImageUri);
-                }
-              }}
-            />
           </View>
+
+          {isCompactHeader && invoiceActionButtons ? (
+            <View className="gap-2">{invoiceActionButtons}</View>
+          ) : null}
         </View>
 
         <ThemedText
@@ -734,6 +754,7 @@ export default function InvoiceDetailScreen() {
             <NumberBadge value={1} />
             <ThemedText
               type="defaultSemiBold"
+              scaleRole="chrome"
               style={{ letterSpacing: 1, textTransform: "uppercase" }}
             >
               {t("invoice.reviewFields")}
@@ -814,6 +835,7 @@ export default function InvoiceDetailScreen() {
                       <ThemedText
                         type="custom"
                         className="text-sm"
+                        scaleRole="chrome"
                         style={{
                           color: isActive ? colors.onAccent : colors.foreground,
                         }}
@@ -833,6 +855,7 @@ export default function InvoiceDetailScreen() {
             <NumberBadge value={2} />
             <ThemedText
               type="defaultSemiBold"
+              scaleRole="chrome"
               style={{ letterSpacing: 1, textTransform: "uppercase" }}
             >
               {t("invoice.notes")}
@@ -844,6 +867,8 @@ export default function InvoiceDetailScreen() {
             style={{ backgroundColor: colors.surface, borderColor: colors.border }}
           >
             <TextInput
+              allowFontScaling
+              maxFontSizeMultiplier={getTextMaxFontSizeMultiplier("body")}
               multiline
               numberOfLines={5}
               onChangeText={setNotes}
@@ -851,6 +876,7 @@ export default function InvoiceDetailScreen() {
               placeholderTextColor={colors.muted}
               style={{
                 color: colors.foreground,
+                includeFontPadding: false,
                 minHeight: 108,
                 textAlignVertical: "top",
               }}
@@ -865,6 +891,7 @@ export default function InvoiceDetailScreen() {
               <NumberBadge value={3} />
               <ThemedText
                 type="defaultSemiBold"
+                scaleRole="chrome"
                 style={{ letterSpacing: 1, textTransform: "uppercase" }}
               >
                 {t("invoice.lineItems")}
@@ -1096,11 +1123,15 @@ function SummaryRow({
   valueColor?: string;
 }) {
   return (
-    <View className="flex-row items-center justify-between gap-4">
-      <ThemedText style={labelColor ? { color: labelColor } : undefined}>
+    <View className="flex-row items-start justify-between gap-4">
+      <ThemedText
+        className="min-w-0 flex-1"
+        style={labelColor ? { color: labelColor } : undefined}
+      >
         {label}
       </ThemedText>
       <ThemedText
+        className="min-w-0 flex-1 text-right"
         type="defaultSemiBold"
         style={valueColor ? { color: valueColor } : undefined}
       >

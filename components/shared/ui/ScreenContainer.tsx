@@ -1,9 +1,17 @@
 import { ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/shared/themed-view';
 
+const HORIZONTAL_PADDING = 20;
+const TOP_PADDING = 16;
+const TAB_BAR_OFFSET = 96;
+
 type BaseProps = {
+  includeTabBarInset?: boolean;
   padded?: boolean;
+  safeAreaBottom?: boolean;
+  safeAreaTop?: boolean;
 };
 
 type StaticContainerProps = BaseProps &
@@ -19,12 +27,31 @@ type ScrollContainerProps = BaseProps &
 type ScreenContainerProps = StaticContainerProps | ScrollContainerProps;
 
 export function ScreenContainer(props: ScreenContainerProps) {
-  const { padded = true } = props;
-  const baseClassName = padded ? 'flex-1 px-5 pt-4' : 'flex-1';
-  const scrollContentClassName = padded ? 'px-5 pt-4' : '';
+  const insets = useSafeAreaInsets();
+  const {
+    includeTabBarInset = props.scroll,
+    padded = true,
+    safeAreaBottom = false,
+    safeAreaTop = true,
+  } = props;
+  const horizontalPadding = padded ? HORIZONTAL_PADDING : 0;
+  const topPadding = (safeAreaTop ? insets.top : 0) + (padded ? TOP_PADDING : 0);
+  const bottomSafePadding = safeAreaBottom ? Math.max(insets.bottom, 12) : 0;
+  const bottomPadding = includeTabBarInset
+    ? TAB_BAR_OFFSET + Math.max(insets.bottom, 12)
+    : bottomSafePadding;
+  const containerPaddingStyle = {
+    ...(horizontalPadding > 0 ? { paddingHorizontal: horizontalPadding } : {}),
+    ...(topPadding > 0 ? { paddingTop: topPadding } : {}),
+    ...(bottomPadding > 0 ? { paddingBottom: bottomPadding } : {}),
+  };
 
   if (props.scroll) {
     const {
+      includeTabBarInset: _includeTabBarInset,
+      padded: _padded,
+      safeAreaBottom: _safeAreaBottom,
+      safeAreaTop: _safeAreaTop,
       scroll,
       contentContainerClassName,
       contentContainerStyle,
@@ -36,8 +63,14 @@ export function ScreenContainer(props: ScreenContainerProps) {
       <ThemedView className="flex-1">
         <ScrollView
           className={`flex-1 ${className ?? ''}`.trim()}
-          contentContainerClassName={`${scrollContentClassName} pb-28 ${contentContainerClassName ?? ''}`.trim()}
-          contentContainerStyle={[{ flexGrow: 1 }, contentContainerStyle]}
+          contentContainerClassName={contentContainerClassName}
+          contentContainerStyle={[
+            {
+              flexGrow: 1,
+              ...containerPaddingStyle,
+            },
+            contentContainerStyle,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           {...rest}
@@ -46,10 +79,26 @@ export function ScreenContainer(props: ScreenContainerProps) {
     );
   }
 
-  const { scroll, className, ...rest } = props;
+  const {
+    className,
+    includeTabBarInset: _includeTabBarInset,
+    padded: _padded,
+    safeAreaBottom: _safeAreaBottom,
+    safeAreaTop: _safeAreaTop,
+    scroll,
+    style,
+    ...rest
+  } = props;
   return (
     <ThemedView className="flex-1">
-      <View className={`${baseClassName} ${className ?? ''}`.trim()} {...rest} />
+      <View
+        className={`flex-1 ${className ?? ''}`.trim()}
+        style={[
+          containerPaddingStyle,
+          style,
+        ]}
+        {...rest}
+      />
     </ThemedView>
   );
 }

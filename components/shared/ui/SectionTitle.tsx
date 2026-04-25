@@ -25,7 +25,9 @@ export function SectionTitle({
     <View style={style} {...props}>
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-1">
-          <ThemedText type="heading">{title}</ThemedText>
+          <ThemedText type="heading" numberOfLines={1} scaleRole="chrome">
+            {title}
+          </ThemedText>
           {description ? (
             <ThemedText style={{ color: colors.muted }}>{description}</ThemedText>
           ) : null}

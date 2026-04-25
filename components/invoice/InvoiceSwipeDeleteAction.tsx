@@ -65,6 +65,8 @@ export function InvoiceSwipeDeleteAction({
           <ThemedText
             type="custom"
             className="text-xs font-bold uppercase tracking-wider"
+            numberOfLines={1}
+            scaleRole="chrome"
             style={{ color: colors.onDanger }}
           >
             {t("common.delete")}

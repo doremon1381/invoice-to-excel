@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, FlatList, Pressable, View } from "react-native";
+import { Alert, FlatList, Pressable, View, useWindowDimensions } from "react-native";
 
 import { ExpenseOverview } from "@/components/home/ExpenseOverview";
 import { InvoiceFilterBar } from "@/components/home/InvoiceFilterBar";
@@ -28,8 +28,10 @@ type FilterValue = "all" | "exported";
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const isCompactDashboard = width <= 400;
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -147,7 +149,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View className="mb-4 flex flex-row gap-4">
+        <View className={isCompactDashboard ? "mb-4 gap-4" : "mb-4 flex flex-row gap-4"}>
           <ExpenseOverview
             currency={monthlyExpense.currency}
             monthDate={monthlyExpense.monthDate}

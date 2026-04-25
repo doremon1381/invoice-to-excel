@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
+import { ThemedText } from "@/components/shared/themed-text";
 import { IconSymbol } from "@/components/shared/ui/icon-symbol";
 import type { Colors } from "@/constants/theme";
 
@@ -31,16 +32,18 @@ export function ScanHeader({
         <IconSymbol name="xmark" size={18} color={colors.foreground} />
       </Pressable> */}
 
-      <Text
+      <ThemedText
         numberOfLines={1}
         className="flex-1 text-center text-md font-bold uppercase tracking-wider"
+        scaleRole="chrome"
         style={{
           color: colors.accent,
           marginHorizontal: 8,
         }}
+        type="custom"
       >
         {title}
-      </Text>
+      </ThemedText>
 
       <Pressable
         accessibilityRole="button"

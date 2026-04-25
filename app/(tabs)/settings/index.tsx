@@ -1,13 +1,14 @@
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
-import { useCallback, useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { GoogleSheetPickerModal } from "@/components/settings/GoogleSheetPickerModal";
 import { ThemedText } from "@/components/shared/themed-text";
 import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
 import { IconSectionTitle } from "@/components/shared/ui/IconSectionTitle";
+import { IconSymbol } from "@/components/shared/ui/icon-symbol";
 import { PageTitle } from "@/components/shared/ui/PageTitle";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
 import { Colors } from "@/constants/theme";
@@ -15,6 +16,7 @@ import { useGoogleAuth } from "@/hooks/settings/useGoogleAuth";
 import { useAppTheme } from "@/hooks/theme/theme-provider";
 import { useColorScheme } from "@/hooks/theme/use-color-scheme";
 import {
+  clearSelectedSpreadsheet,
   getSelectedSpreadsheet,
   saveSelectedSpreadsheet,
   type SelectedGoogleSpreadsheet,
@@ -33,8 +35,10 @@ type PreferenceOption = {
 export default function SettingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const isCompactLayout = width <= 430;
   const { colorScheme: themeMode, setThemeMode } = useAppTheme();
   const [selectedSpreadsheet, setSelectedSpreadsheet] =
     useState<SelectedGoogleSpreadsheet | null>(null);
@@ -91,6 +95,19 @@ export default function SettingsScreen() {
     );
   }
 
+  async function handleGoogleSignOut() {
+    await signOut();
+    await clearSelectedSpreadsheet();
+    setSelectedSpreadsheet(null);
+    setIsSheetPickerVisible(false);
+  }
+
+  async function handleClearSelectedSheet() {
+    await clearSelectedSpreadsheet();
+    setSelectedSpreadsheet(null);
+    setIsSheetPickerVisible(false);
+  }
+
   return (
     <ScreenContainer scroll>
       <PageTitle title={t("settings.title")} />
@@ -98,6 +115,7 @@ export default function SettingsScreen() {
       <Card className="mt-5 rounded-[28px] border p-4">
         <View style={styles.preferenceGroup}>
           <PreferenceRow
+            compact={isCompactLayout}
             colors={colors}
             label={t("settings.appearance")}
             options={[
@@ -122,6 +140,7 @@ export default function SettingsScreen() {
             ]}
           />
           <PreferenceRow
+            compact={isCompactLayout}
             colors={colors}
             label={t("settings.language")}
             options={[
@@ -164,66 +183,81 @@ export default function SettingsScreen() {
       <Card className="mt-4 rounded-[28px] border p-5">
         <View className="gap-3">
           {account ? (
-            <View
-              className="rounded-2xl border px-4 py-3"
-              style={{ borderColor: colors.border, backgroundColor: colors.surface }}
-            >
-              <ThemedText type="defaultSemiBold">
-                {t("settings.googleSignedInAs", {
-                  email: account.email ?? t("settings.googleUnknownEmail"),
-                })}
-              </ThemedText>
-              <View className="mt-3">
-                <Button
-                  label={t("settings.googleSignOut")}
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => void signOut()}
-                />
-              </View>
+            <View style={styles.googleSheetStack}>
+              <GoogleSheetInfoBox
+                action={
+                  <Pressable
+                    accessibilityLabel={t("settings.googleClearAccountA11y")}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => void handleGoogleSignOut()}
+                    style={({ pressed }) => [
+                      styles.googleSheetIconButton,
+                      { opacity: pressed ? 0.82 : 1 },
+                    ]}
+                  >
+                    <IconSymbol
+                      color={Colors.dark.foreground}
+                      name="xmark"
+                      size={18}
+                    />
+                  </Pressable>
+                }
+                label={t("settings.googleAccountLabel")}
+                value={account.email ?? t("settings.googleUnknownEmail")}
+              />
+
+              <GoogleSheetInfoBox
+                action={
+                  selectedSpreadsheet ? (
+                    <Pressable
+                      accessibilityLabel={t("settings.googleClearSelectedSheetA11y")}
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        void handleClearSelectedSheet();
+                      }}
+                      style={({ pressed }) => [
+                        styles.googleSheetIconButton,
+                        { opacity: pressed ? 0.82 : 1 },
+                      ]}
+                    >
+                      <IconSymbol
+                        color={Colors.dark.foreground}
+                        name="xmark"
+                        size={18}
+                      />
+                    </Pressable>
+                  ) : null
+                }
+                label={t("settings.googleSelectedSheetLabel")}
+                onPress={() => setIsSheetPickerVisible(true)}
+                value={
+                  selectedSpreadsheet?.spreadsheetName ??
+                  t("settings.googleNoCurrentSheet")
+                }
+              />
             </View>
           ) : (
-            <Button
-              disabled={isGoogleConfigLoading || isSigningIn}
-              label={t("settings.googleSignIn")}
-              loading={isSigningIn}
-              onPress={() => void handleSignIn()}
-            />
+            <View style={styles.googleSheetStack}>
+              <Button
+                disabled={isGoogleConfigLoading || isSigningIn}
+                label={t("settings.googleSignIn")}
+                loading={isSigningIn}
+                onPress={() => void handleSignIn()}
+                style={styles.googleSheetPrimaryButton}
+              />
+              <GoogleSheetInfoBox
+                disabled
+                value={t("settings.googleChooseOrCreateSheet")}
+              />
+            </View>
           )}
 
           {googleAuthError ? (
             <ThemedText style={{ color: colors.danger }}>{googleAuthError}</ThemedText>
           ) : null}
-
-          <View
-            className="rounded-2xl border px-4 py-3"
-            style={{ borderColor: colors.border, backgroundColor: colors.background }}
-          >
-            <ThemedText style={{ color: colors.muted }}>
-              {t("settings.googleCurrentSheet")}
-            </ThemedText>
-            <ThemedText className="mt-1" type="defaultSemiBold">
-              {selectedSpreadsheet?.spreadsheetName ??
-                t("settings.googleNoCurrentSheet")}
-            </ThemedText>
-          </View>
-
-          {!account ? (
-            <ThemedText style={{ color: colors.muted }}>
-              {t("settings.googleChooseSheetSignInFirst")}
-            </ThemedText>
-          ) : null}
-
-          <Button
-            disabled={isGoogleConfigLoading || !account}
-            label={
-              selectedSpreadsheet
-                ? t("settings.googleChangeSheet")
-                : t("settings.googleChooseOrCreateSheet")
-            }
-            variant="secondary"
-            onPress={() => setIsSheetPickerVisible(true)}
-          />
         </View>
       </Card>
 
@@ -236,18 +270,10 @@ export default function SettingsScreen() {
       </View>
 
       <Card className="mt-4 rounded-[28px] border p-5">
-        <Pressable
-          className="min-h-[52px] items-center justify-center rounded-2xl px-4 py-4"
-          style={({ pressed }) => ({
-            backgroundColor: colors.accent,
-            opacity: pressed ? 0.85 : 1,
-          })}
+        <Button
+          label={t("settings.openDatabaseManagement")}
           onPress={() => router.push("/(tabs)/settings/database-management")}
-        >
-          <ThemedText style={{ color: colors.foreground }}>
-            {t("settings.openDatabaseManagement")}
-          </ThemedText>
-        </Pressable>
+        />
       </Card>
 
       <GoogleSheetPickerModal
@@ -259,19 +285,130 @@ export default function SettingsScreen() {
   );
 }
 
+function GoogleSheetInfoBox({
+  action,
+  disabled = false,
+  label,
+  onPress,
+  value,
+}: {
+  action?: ReactNode;
+  disabled?: boolean;
+  label?: string;
+  onPress?: () => void;
+  value: string;
+}) {
+  const boxColors = Colors.dark;
+  const isCenterContent = !label && !action;
+
+  if (isCenterContent) {
+    return (
+      <View
+        style={[
+          styles.googleSheetInfoBox,
+          styles.googleSheetInfoBoxCentered,
+          {
+            backgroundColor: boxColors.surfaceAlt,
+            borderColor: boxColors.border,
+            opacity: disabled ? 0.72 : 1,
+          },
+        ]}
+      >
+        <ThemedText
+          className="text-base font-bold"
+          numberOfLines={2}
+          scaleRole="chrome"
+          style={[styles.googleSheetCenteredText, { color: boxColors.foreground }]}
+          type="custom"
+        >
+          {value}
+        </ThemedText>
+      </View>
+    );
+  }
+
+  const content = (
+    <View style={styles.googleSheetBoxInner}>
+      <View style={styles.googleSheetTextWrap}>
+        {label ? (
+          <ThemedText
+            className="text-caption font-semibold"
+            numberOfLines={1}
+            scaleRole="chrome"
+            style={{ color: boxColors.mutedLight }}
+            type="custom"
+          >
+            {label}
+          </ThemedText>
+        ) : null}
+        <ThemedText
+          className={label ? "mt-1 text-base font-bold" : "text-base font-bold"}
+          numberOfLines={2}
+          scaleRole="chrome"
+          style={{ color: boxColors.foreground }}
+          type="custom"
+        >
+          {value}
+        </ThemedText>
+      </View>
+      {action ? <View style={styles.googleSheetActionWrap}>{action}</View> : null}
+    </View>
+  );
+
+  if (disabled || !onPress) {
+    return (
+      <View
+        style={[
+          styles.googleSheetInfoBox,
+          {
+            backgroundColor: boxColors.surfaceAlt,
+            borderColor: boxColors.border,
+            opacity: disabled ? 0.72 : 1,
+          },
+        ]}
+      >
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.googleSheetInfoBox,
+        {
+          backgroundColor: boxColors.surfaceAlt,
+          borderColor: boxColors.border,
+          opacity: pressed ? 0.86 : 1,
+        },
+      ]}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
 function PreferenceRow({
+  compact,
   colors,
   label,
   options,
 }: {
+  compact: boolean;
   colors: SettingsPalette;
   label: string;
   options: PreferenceOption[];
 }) {
   return (
-    <View style={styles.preferenceRow}>
-      <View style={styles.preferenceLabelWrap}>
-        <ThemedText style={styles.preferenceLabel} type="defaultSemiBold">
+    <View style={[styles.preferenceRow, compact && styles.preferenceRowCompact]}>
+      <View style={[styles.preferenceLabelWrap, compact && styles.preferenceLabelWrapCompact]}>
+        <ThemedText
+          scaleRole="chrome"
+          style={styles.preferenceLabel}
+          type="defaultSemiBold"
+        >
           {label}
         </ThemedText>
       </View>
@@ -279,6 +416,7 @@ function PreferenceRow({
       <View
         style={[
           styles.preferencePill,
+          compact && styles.preferencePillCompact,
           {
             backgroundColor: colors.surfaceAlt,
           },
@@ -292,6 +430,7 @@ function PreferenceRow({
             onPress={option.onPress}
             style={({ pressed }) => [
               styles.preferenceOption,
+              compact && styles.preferenceOptionCompact,
               {
                 backgroundColor: option.active ? colors.accent : "transparent",
                 opacity: pressed ? 0.88 : 1,
@@ -299,11 +438,14 @@ function PreferenceRow({
             ]}
           >
             <ThemedText
+              className="text-sm font-bold"
+              numberOfLines={1}
+              scaleRole="chrome"
               style={{
                 color: option.active ? colors.onAccent : colors.mutedLight,
-                fontWeight: "700",
                 textAlign: "center",
               }}
+              type="custom"
             >
               {option.label}
             </ThemedText>
@@ -316,7 +458,7 @@ function PreferenceRow({
 
 const styles = StyleSheet.create({
   preferenceGroup: {
-    gap: 12,
+    gap: 14,
   },
   preferenceRow: {
     alignItems: "center",
@@ -324,24 +466,83 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: "space-between",
   },
+  preferenceRowCompact: {
+    alignItems: "stretch",
+    flexDirection: "column",
+  },
   preferenceLabelWrap: {
     flex: 1,
   },
+  preferenceLabelWrapCompact: {
+    width: "100%",
+  },
   preferenceLabel: {
-    lineHeight: 20,
+    lineHeight: 22,
   },
   preferenceDivider: {
     height: StyleSheet.hairlineWidth,
   },
   preferencePill: {
-    borderRadius: 999,
+    borderRadius: 20,
     flexDirection: "row",
     padding: 4,
+    gap: 4,
+  },
+  preferencePillCompact: {
+    width: "100%",
   },
   preferenceOption: {
-    borderRadius: 999,
-    minWidth: 76,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    alignItems: "center",
+    borderRadius: 16,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 40,
+    minWidth: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  preferenceOptionCompact: {
+    minHeight: 44,
+  },
+  googleSheetActionWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
+    width: 32,
+  },
+  googleSheetBoxInner: {
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  googleSheetInfoBoxCentered: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleSheetCenteredText: {
+    textAlign: "center",
+  },
+  googleSheetIconButton: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  googleSheetInfoBox: {
+    borderRadius: 18,
+    borderWidth: 1,
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  googleSheetStack: {
+    gap: 10,
+  },
+  googleSheetPrimaryButton: {
+    borderRadius: 18,
+    minHeight: 76,
+  },
+  googleSheetTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
 });

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ThemedText } from '@/components/shared/themed-text';
 import { Colors } from '@/constants/theme';
@@ -23,9 +23,9 @@ export function LoadingOverlay({ message, variant = 'default' }: LoadingOverlayP
         style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
         <ActivityIndicator size="large" color={colors.accent} />
         {variant === 'dark' ? (
-          <Text className="mt-3 text-center" style={{ color: colors.foreground }}>
+          <ThemedText className="mt-3 text-center" style={{ color: colors.foreground }}>
             {message}
-          </Text>
+          </ThemedText>
         ) : (
           <ThemedText className="mt-3 text-center">{message}</ThemedText>
         )}
