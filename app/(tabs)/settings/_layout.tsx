@@ -31,7 +31,10 @@ export default function SettingsLayout() {
         },
       }}
     >
-      <Stack.Screen name="index" options={{ title: t("tabs.settings") }} />
+      <Stack.Screen
+        name="index"
+        options={{ title: t("tabs.settings"), headerShown: false }}
+      />
       <Stack.Screen
         name="database-management"
         options={{ title: t("stack.databaseManagement") }}

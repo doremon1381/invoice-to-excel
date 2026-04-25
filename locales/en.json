@@ -34,7 +34,7 @@
     "database": "Database",
     "databaseDescription": "Review storage, export history, and Excel tools.",
     "openDatabaseManagement": "Open database management",
-    "googleSheets": "Google Sheets",
+    "googleSheets": "Google Sheet",
     "googleSheetsDescription": "Authorize your Google account and configure the target spreadsheet for invoice row sync.",
     "googleSignIn": "Sign in with Google",
     "googleSignOut": "Sign out",
@@ -51,7 +51,7 @@
     "googleSheetSelectedTitle": "Google Sheet selected",
     "googleSheetSelectedMessage": "Invoices will be exported to \"{{name}}\".",
     "googleSheetPickerTitle": "Choose / create Google Sheet",
-    "googleSheetPickerHint": "Choose an existing spreadsheet or create a new one. The app writes invoices to the Invoices tab.",
+    "googleSheetPickerHint": "Choose an existing spreadsheet or create a new one. The app writes to the Trang tính1 tab and auto-detects the 4 required headers on row 1.",
     "googleSheetPickerExisting": "Existing sheet",
     "googleSheetPickerNew": "Create new",
     "googleSheetPickerLoadFailed": "Unable to load Google Sheets.",
@@ -94,7 +94,7 @@
     "googleApiNotFound": "The Google Sheet was not found, or the current account does not have access to it.",
     "googleApiRequestFailed": "Google request failed with status {{status}}.",
     "googleApiNetworkFailed": "Unable to reach the Google API. Check your network connection and try again.",
-    "googleApiMissingSheetId": "Google Sheets did not return a sheet ID for the Invoices tab.",
+    "googleApiMissingSheetId": "Google Sheets did not return a sheet ID for the Trang tính1 tab.",
     "googleApiMissingSpreadsheetId": "Google Sheets did not return a spreadsheet ID."
   },
   "home": {

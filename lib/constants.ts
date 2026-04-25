@@ -9,7 +9,13 @@ export const EXPORT_HISTORY_STORAGE_KEY = "invoice_export_history_v1";
 export const OPENAI_API_KEY_STORAGE_KEY = "openai_api_key_secure_v1";
 export const GOOGLE_SELECTED_SPREADSHEET_STORAGE_KEY =
   "google_selected_spreadsheet_secure_v1";
-export const GOOGLE_INVOICES_SHEET_TAB = "Invoices";
+export const GOOGLE_TARGET_SHEET_TAB = "Trang tính1";
+export const GOOGLE_SHEET_SUMMARY_HEADERS = [
+  "Ngày tháng",
+  "Tên hóa đơn",
+  "Giá tiền hóa đơn",
+  "Người thanh toán",
+] as const;
 export const GOOGLE_SHEETS_API_BASE =
   "https://sheets.googleapis.com/v4/spreadsheets";
 export const GOOGLE_DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
@@ -79,4 +85,16 @@ Rules:
 - If a field is not found, use null
 - The invoice may be in Vietnamese — keep Vietnamese as much as possible
 - currency should be the 3-letter ISO code (e.g. VND, USD, EUR)
-- invoice_title should be a short one-line summary of the invoice, easy to read, with no markdown`;
+- invoice_title should be a short natural one-line summary of the invoice, easy to read, with no markdown
+- invoice_title should usually be around 3 to 8 words
+- invoice_title should keep spaces between words
+- if a platform is clearly present, use its full name (for example: Shopee, TikTok Shop, Lazada, Tiki)
+- prioritize product name first, then company/store name if helpful
+- if there are many products, using the company/store name instead of a long list is acceptable
+- Examples of good invoice_title values:
+  - Shopee tai nghe Anker ABC
+  - tai nghe Anker ABC
+  - Shopee Cong ty Minh Phat
+  - banh gao, sua chua Orion
+  - Shopee tai nghe
+  - Cong ty Minh Phat`;

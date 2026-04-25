@@ -34,7 +34,7 @@
     "database": "Cơ sở dữ liệu",
     "databaseDescription": "Xem lưu trữ, lịch sử xuất và công cụ Excel.",
     "openDatabaseManagement": "Mở quản lý cơ sở dữ liệu",
-    "googleSheets": "Google Sheets",
+    "googleSheets": "Google Sheet",
     "googleSheetsDescription": "Đăng nhập Google và cấu hình bảng tính đích để đồng bộ dòng hóa đơn.",
     "googleSignIn": "Đăng nhập Google",
     "googleSignOut": "Đăng xuất",
@@ -51,7 +51,7 @@
     "googleSheetSelectedTitle": "Đã chọn Google Sheet",
     "googleSheetSelectedMessage": "Hóa đơn sẽ được xuất vào \"{{name}}\".",
     "googleSheetPickerTitle": "Chọn / tạo Google Sheet",
-    "googleSheetPickerHint": "Chọn bảng tính có sẵn hoặc tạo bảng tính mới. App sẽ dùng tab Invoices để ghi hóa đơn.",
+    "googleSheetPickerHint": "Chọn bảng tính có sẵn hoặc tạo bảng tính mới. App sẽ ghi vào tab Trang tính1 và tự dò 4 cột cần thiết trên hàng 1.",
     "googleSheetPickerExisting": "Sheet có sẵn",
     "googleSheetPickerNew": "Tạo mới",
     "googleSheetPickerLoadFailed": "Không thể tải danh sách Google Sheets.",
@@ -94,7 +94,7 @@
     "googleApiNotFound": "Không tìm thấy Google Sheet hoặc tài khoản hiện tại không có quyền truy cập.",
     "googleApiRequestFailed": "Yêu cầu Google thất bại với mã {{status}}.",
     "googleApiNetworkFailed": "Không thể kết nối tới Google API. Vui lòng kiểm tra mạng rồi thử lại.",
-    "googleApiMissingSheetId": "Google Sheets không trả về sheet ID cho tab Invoices.",
+    "googleApiMissingSheetId": "Google Sheets không trả về sheet ID cho tab Trang tính1.",
     "googleApiMissingSpreadsheetId": "Google Sheets không trả về spreadsheet ID."
   },
   "home": {

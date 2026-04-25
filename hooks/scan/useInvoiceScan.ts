@@ -7,6 +7,7 @@ import { useCallback, useState, type RefObject } from 'react';
 
 import { IMAGE_COMPRESS_QUALITY, IMAGE_MAX_WIDTH, OPENAI_API_KEY } from '@/lib/constants';
 import { i18n } from '@/lib/i18n';
+import { buildCompactInvoiceTitle } from '@/lib/invoice';
 import { extractInvoiceData } from '@/lib/openai';
 import type { ExtractedInvoice, InvoiceStatus } from '@/lib/types';
 
@@ -115,12 +116,13 @@ export function useInvoiceScan() {
       //Alert.alert('debug - extracted', extracted.toString());
       //Alert.alert('debug - rawText', rawText.toString());
 
+      const compactInvoiceTitle = buildCompactInvoiceTitle(extracted, invoiceTitle);
       const status = deriveStatus(extracted);
       const normalizedRawText = deriveRawText(extracted, rawText);
       setPreviewData(toPreviewData(extracted, rawText, status));
 
       return {
-        invoiceTitle,
+        invoiceTitle: compactInvoiceTitle,
         imageUri: preparedImage.uri,
         imageBase64: preparedImage.base64,
         imageMime: preparedImage.mimeType,

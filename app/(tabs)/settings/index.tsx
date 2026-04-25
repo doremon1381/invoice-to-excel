@@ -7,8 +7,9 @@ import { GoogleSheetPickerModal } from "@/components/settings/GoogleSheetPickerM
 import { ThemedText } from "@/components/shared/themed-text";
 import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
+import { IconSectionTitle } from "@/components/shared/ui/IconSectionTitle";
+import { PageTitle } from "@/components/shared/ui/PageTitle";
 import { ScreenContainer } from "@/components/shared/ui/ScreenContainer";
-import { SectionTitle } from "@/components/shared/ui/SectionTitle";
 import { Colors } from "@/constants/theme";
 import { useGoogleAuth } from "@/hooks/settings/useGoogleAuth";
 import { useAppTheme } from "@/hooks/theme/theme-provider";
@@ -92,12 +93,9 @@ export default function SettingsScreen() {
 
   return (
     <ScreenContainer scroll>
-      <SectionTitle
-        title={t("settings.title")}
-        description={t("settings.subtitle")}
-      />
+      <PageTitle title={t("settings.title")} />
 
-      <Card className="mt-4 rounded-[28px] border p-4">
+      <Card className="mt-5 rounded-[28px] border p-4">
         <View style={styles.preferenceGroup}>
           <PreferenceRow
             colors={colors}
@@ -155,13 +153,16 @@ export default function SettingsScreen() {
         </ThemedText>
       </Card> */}
 
-      <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">{t("settings.googleSheets")}</ThemedText>
-        <ThemedText className="mt-2" style={{ color: colors.muted }}>
-          {t("settings.googleSheetsDescription")}
-        </ThemedText>
+      <View className="mt-6 gap-2">
+        <IconSectionTitle
+          iconColor={colors.accent}
+          iconName="tablecells.fill"
+          title={t("settings.googleSheets")}
+        />
+      </View>
 
-        <View className="mt-4 gap-3">
+      <Card className="mt-4 rounded-[28px] border p-5">
+        <View className="gap-3">
           {account ? (
             <View
               className="rounded-2xl border px-4 py-3"
@@ -226,13 +227,17 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      <Card className="mt-5 rounded-[28px] border p-5">
-        <ThemedText type="defaultSemiBold">{t("settings.database")}</ThemedText>
-        <ThemedText className="mt-2" style={{ color: colors.muted }}>
-          {t("settings.databaseDescription")}
-        </ThemedText>
+      <View className="mt-6 gap-2">
+        <IconSectionTitle
+          iconColor={colors.accent}
+          iconName="externaldrive.fill"
+          title={t("settings.database")}
+        />
+      </View>
+
+      <Card className="mt-4 rounded-[28px] border p-5">
         <Pressable
-          className="mt-4 min-h-[52px] items-center justify-center rounded-2xl px-4 py-4"
+          className="min-h-[52px] items-center justify-center rounded-2xl px-4 py-4"
           style={({ pressed }) => ({
             backgroundColor: colors.accent,
             opacity: pressed ? 0.85 : 1,

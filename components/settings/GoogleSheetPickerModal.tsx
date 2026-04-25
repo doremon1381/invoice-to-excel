@@ -15,10 +15,7 @@ import { Button } from "@/components/shared/ui/Button";
 import { Card } from "@/components/shared/ui/Card";
 import { FieldInput } from "@/components/shared/ui/FieldInput";
 import { listGoogleSpreadsheets, type GoogleSpreadsheetFile } from "@/lib/googleDrive";
-import {
-  createGoogleSpreadsheet,
-  ensureInvoicesTab,
-} from "@/lib/googleSheets";
+import { createGoogleSpreadsheet } from "@/lib/googleSheets";
 import type { SelectedGoogleSpreadsheet } from "@/lib/googleSheetSelection";
 import { getGoogleAccessToken } from "@/lib/googleAuth";
 import { Colors } from "@/constants/theme";
@@ -106,8 +103,6 @@ export function GoogleSheetPickerModal({
     setError(null);
 
     try {
-      const accessToken = await getGoogleAccessToken();
-      await ensureInvoicesTab(accessToken, sheet.id);
       onSelected({
         selectedAt: new Date().toISOString(),
         spreadsheetId: sheet.id,
@@ -138,7 +133,6 @@ export function GoogleSheetPickerModal({
         accessToken,
         newSheetTitle,
       );
-      await ensureInvoicesTab(accessToken, created.spreadsheetId);
       onSelected({
         selectedAt: new Date().toISOString(),
         spreadsheetId: created.spreadsheetId,

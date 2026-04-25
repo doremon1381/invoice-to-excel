@@ -36,7 +36,11 @@ import {
   saveInvoice,
   updateInvoice,
 } from "@/lib/db";
-import { normalizePaymentMethod } from "@/lib/invoice";
+import {
+  buildInvoiceTitleSuggestion,
+  normalizeInvoiceTitle,
+  normalizePaymentMethod,
+} from "@/lib/invoice";
 import {
   GoogleSheetConfigRequiredError,
   InvoiceAlreadySyncedError,
@@ -302,7 +306,11 @@ export default function InvoiceDetailScreen() {
     }
 
     setHeaderImageUri(invoice.image_uri);
-    setInvoiceTitle(invoice.invoiceTitle ?? "");
+    setInvoiceTitle(
+      isPreviewMode
+        ? buildInvoiceTitleSuggestion(invoice, invoice.invoiceTitle) ?? ""
+        : normalizeInvoiceTitle(invoice.invoiceTitle) ?? "",
+    );
     setVendorName(invoice.vendor_name ?? "");
     setVendorAddress(invoice.vendor_address ?? "");
     setInvoiceDate(invoice.invoice_date ?? "");
@@ -315,7 +323,7 @@ export default function InvoiceDetailScreen() {
         ? invoice.line_items.map(toEditableLineItem)
         : [],
     );
-  }, [invoice]);
+  }, [invoice, isPreviewMode]);
 
   function updateLineItemField(
     index: number,
@@ -368,7 +376,6 @@ export default function InvoiceDetailScreen() {
     trimmedInvoiceTitle: string | null;
     missingLabels: string[];
   } {
-    const trimmedInvoiceTitle = invoiceTitle.trim() || null;
     const totalAmount = parseNullableNumber(totalAmountStr);
     const persistedLineItems = lineItems
       .filter((item) => !isEditableLineItemEmpty(item))
@@ -397,6 +404,7 @@ export default function InvoiceDetailScreen() {
       invoice_date: extracted.invoice_date,
       total_amount: extracted.total_amount,
     });
+    const trimmedInvoiceTitle = normalizeInvoiceTitle(invoiceTitle);
 
     const missingLabels: string[] = [];
 
